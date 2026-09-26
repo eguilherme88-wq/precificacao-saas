@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Precificação de Softwares e Módulos</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--primary:#155eef;--primary2:#0f4dcc;--dark:#172033;--muted:#667085;--line:#e4e7ec;--ok:#079455;--warn:#dc6803;--sidebar:#102a56}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--dark)}
+header{position:fixed;left:240px;right:0;top:0;height:88px;z-index:10;background:linear-gradient(135deg,#102a56,#155eef);color:white;padding:18px 28px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:23px}header p{margin:5px 0 0;opacity:.85}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--sidebar);color:white;padding:22px 14px;z-index:20;box-shadow:4px 0 18px #10182820}
+.brand{padding:4px 10px 24px;border-bottom:1px solid #ffffff22;margin-bottom:16px}.brand h2{font-size:18px;margin:0 0 6px}.brand small{opacity:.72;line-height:1.4}
+.nav{display:flex;flex-direction:column;gap:7px}.tab{border:0;background:transparent;color:#dbe7ff;padding:12px 14px;border-radius:9px;cursor:pointer;font-weight:700;text-align:left;font-size:14px}.tab:hover{background:#ffffff12}.tab.active{background:var(--primary);color:#fff}
+.container{margin-left:240px;padding:112px 24px 30px;max-width:1600px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 3px 12px #1018280a}
+.kpi{display:flex;align-items:center;gap:14px}.kpi-icon{width:50px;height:50px;min-width:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.kpi b{display:block;font-size:26px;margin-top:5px;line-height:1.15}.muted{color:var(--muted);font-size:13px}
+.section{display:none}.section.active{display:block}.row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.row3{grid-template-columns:repeat(3,1fr)}.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+label{font-size:13px;font-weight:600;margin-bottom:6px;display:block}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:8px;background:white;font:inherit}textarea{min-height:90px}
+button{border:0;border-radius:8px;padding:11px 16px;cursor:pointer;font-weight:700}.primary{background:var(--primary);color:white}.primary:hover{background:var(--primary2)}.secondary{background:#eef4ff;color:#155eef}.danger{background:#fee4e2;color:#b42318}.actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+.form-card{margin-bottom:16px}.title{font-size:18px;font-weight:800;margin:0 0 15px}
+.badge{display:inline-block;padding:5px 9px;border-radius:20px;font-size:12px;font-weight:700}.ok{background:#ecfdf3;color:#027a48}.warn{background:#fffaeb;color:#b54708}.info{background:#eff8ff;color:#175cd3}
+table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden}th,td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:middle}th{background:#f8fafc;white-space:nowrap}
+.empty{text-align:center;padding:35px;color:var(--muted)}
+.nowrap{white-space:nowrap}
+.login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#102a56,#155eef);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}.login-box{width:min(420px,100%);background:#fff;border-radius:18px;padding:30px;box-shadow:0 25px 60px #0004}.login-box h1{margin:0 0 8px}.login-box .field{margin-top:16px}.login-error{color:#b42318;font-size:13px;margin-top:12px;min-height:18px}.app-locked{display:none!important}
+@media(max-width:1100px){.grid,.row4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.sidebar{width:190px}header{left:190px}.container{margin-left:190px}.row,.row3{grid-template-columns:1fr}.grid,.row4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-box">
+    <h1>💰 Precificação SaaS</h1><p class="muted">Entre para acessar o sistema</p>
+    <div class="field"><label>Usuário</label><input id="loginUsuario" value="admin" autocomplete="username"></div>
+    <div class="field"><label>Senha</label><input id="loginSenha" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrarSistema()"></div>
+    <button class="primary" style="width:100%;margin-top:20px" onclick="entrarSistema()">🔐 Entrar</button>
+    <div id="loginErro" class="login-error"></div>
+    <p class="muted" style="margin-top:14px">Primeiro acesso: usuário <b>admin</b> e senha <b>Admin@123</b>.</p>
+  </div>
+</div>
+<aside class="sidebar">
+  <div class="brand">
+    <h2>💰 Precificação SaaS</h2>
+    <small>Gestão de sistemas, módulos e propostas</small>
+  </div>
+  <nav class="nav">
+    <button class="tab active" onclick="abrir('dashboard',this)">📊 Dashboard</button>
+    <button class="tab" onclick="abrir('modulos',this)">🧩 Módulos e Sistemas</button>
+    <button class="tab" onclick="abrir('categorias',this)">🏷️ Categorias</button>
+    <button class="tab" onclick="abrir('clientes',this)">👥 Clientes</button>
+    <button class="tab" onclick="abrir('proposta',this)">📄 Montar Proposta</button>
+    <button class="tab" onclick="abrir('historico',this)">📋 Histórico de Propostas</button>
+    <button class="tab" onclick="abrir('seguranca',this)">🔐 Segurança</button>
+    <button class="tab" onclick="sairSistema()">🚪 Sair</button>
+  </nav>
+</aside>
+
+<header>
+  <div><h1>Sistema de Precificação de Softwares</h1><p>Gerenciamento de custos por módulo, implantação e mensalidades (SaaS)</p></div>
+  <button class="secondary" onclick="abrir('proposta')">＋ Nova proposta</button>
+</header>
+
+<div class="container">
+  <div class="grid">
+    <div class="card kpi"><div class="kpi-icon" style="background:#eef4ff">🧩</div><div><span class="muted">Sistemas / Módulos</span><b><span id="kSistemas">0</span> / <span id="kModulos">0</span></b></div></div>
+    <div class="card kpi"><div class="kpi-icon" style="background:#eff8ff">📄</div><div><span class="muted">Propostas geradas</span><b id="kPropostas">0</b></div></div>
+    <div class="card kpi"><div class="kpi-icon" style="background:#ecfdf3">✅</div><div><span class="muted">Propostas aceitas</span><b id="kAceitas">0</b></div></div>
+    <div class="card kpi"><div class="kpi-icon" style="background:#fffaeb">💰</div><div><span class="muted">Ticket médio das propostas</span><b id="kMediaSetup" style="font-size:20px">R$ 0,00</b></div></div>
+    <div class="card kpi"><div class="kpi-icon" style="background:#f4f0ff">🗂️</div><div><span class="muted">Modelo comercial</span><b id="kMediaMensal" style="font-size:20px">Licença anual</b></div></div>
+  </div>
+
+  <section id="dashboard" class="section active">
+    <div class="card" style="margin-top:22px">
+      <h2 class="title">📋 Últimas Propostas Comerciais</h2>
+      <div id="dashTabela"></div>
+    </div>
+  </section>
+
+  <section id="modulos" class="section">
+    <div class="card form-card">
+      <h2 class="title">🔎 Buscar Sistema ou Módulo</h2>
+      <div class="row">
+        <div><label>Pesquisar</label><input id="buscaModSis" placeholder="Digite o nome do sistema, módulo, categoria ou descrição..." oninput="atualizarTudo()"></div>
+        <div><label>Filtrar por Categoria</label><select id="buscaModSisCat" onchange="atualizarTudo()"><option value="">Todas as categorias</option></select></div>
+      </div>
+      <small class="muted">Ao pesquisar o nome de um sistema, os módulos vinculados a ele aparecem automaticamente na lista de módulos abaixo.</small>
+    </div>
+    <div class="card form-card">
+      <h2 class="title" id="tituloSistema">Cadastrar Sistema</h2>
+      <div class="row row3">
+        <div><label>Nome do Sistema</label><input id="sNome" placeholder="Ex.: Sistema de SST"></div>
+        <div><label>Categoria (opcional)</label><select id="sCat" onchange="preencherDescPorCategoria()"></select></div>
+        <div><label>Descrição do Sistema</label><input id="sDesc" placeholder="Descreva resumidamente o sistema"></div>
+      </div>
+      <div class="actions"><button class="primary" id="btnSalvarSistema" onclick="salvarSistema()">💾 Salvar Sistema</button><button class="secondary" onclick="limparSistemaForm()">↺ Limpar</button><button class="danger" id="btnCancelarSis" style="display:none" onclick="limparSistemaForm()">Cancelar edição</button></div>
+    </div>
+    <div class="card form-card"><div id="sisTabela"></div></div>
+    <div class="card form-card">
+      <h2 class="title" id="tituloModulo">Cadastrar Módulo do Sistema</h2>
+      <div class="row row4">
+        <div><label>Nome do Módulo</label><input id="mNome" placeholder="Ex.: Módulo de Relatórios"></div>
+        <div><label>Sistema</label><select id="mSistema"></select></div>
+        <div><label>Categoria</label><select id="mCat"></select></div>
+        <div><label>Valor mensal da licença (R$)</label><input id="mAnual" type="number" min="0" step="0.01" placeholder="0,00"></div>
+      </div>
+      <label style="margin-top:14px">Descrição detalhada das funcionalidades</label><textarea id="mDesc" placeholder="Descreva o que este módulo entrega..."></textarea>
+      <div class="actions">
+        <button class="primary" id="btnSalvarModulo" onclick="salvarModulo()">💾 Salvar Módulo</button>
+        <button class="secondary" onclick="limparModuloForm()">↺ Limpar</button>
+        <button class="danger" id="btnCancelarMod" style="display:none" onclick="limparModuloForm()">Cancelar edição</button>
+      </div>
+    </div>
+    <div class="card"><div id="modTabela"></div></div>
+  </section>
+
+  <section id="categorias" class="section">
+    <div class="card form-card">
+      <h2 class="title" id="tituloCategoria">Cadastrar Categoria</h2>
+      <div class="row"><div><label>Nome da Categoria</label><input id="cNome" placeholder="Ex.: Financeiro"></div><div><label>Descrição</label><input id="cDesc" placeholder="Descrição opcional"></div></div>
+      <div class="actions"><button class="primary" id="btnSalvarCategoria" onclick="salvarCategoria()">💾 Salvar Categoria</button><button class="secondary" onclick="limparCategoriaForm()">↺ Limpar</button><button class="danger" id="btnCancelarCat" style="display:none" onclick="limparCategoriaForm()">Cancelar edição</button></div>
+    </div>
+    <div class="card"><div id="catTabela"></div></div>
+  </section>
+
+  <section id="clientes" class="section">
+    <div class="card form-card">
+      <h2 class="title" id="tituloCliente">Cadastrar Cliente</h2>
+      <div class="row row3">
+        <div><label>Cliente / Empresa</label><input id="cCliNome" placeholder="Ex.: Empresa ABC Ltda"></div>
+        <div><label>CPF / CNPJ</label><input id="cCliDocumento" placeholder="CPF ou CNPJ"></div>
+        <div><label>Responsável / Contato</label><input id="cCliContato" placeholder="Nome do contato"></div>
+        <div><label>Telefone</label><input id="cCliTelefone" placeholder="(00) 00000-0000"></div>
+        <div><label>E-mail</label><input id="cCliEmail" type="email" placeholder="cliente@empresa.com.br"></div>
+        <div><label>Cidade / Estado</label><input id="cCliCidade" placeholder="Cidade - UF"></div>
+      </div>
+      <div class="actions"><button class="primary" id="btnSalvarCliente" onclick="salvarCliente()">💾 Salvar Cliente</button><button class="secondary" onclick="limparClienteForm()">↺ Limpar</button><button class="danger" id="btnCancelarCli" style="display:none" onclick="limparClienteForm()">Cancelar edição</button></div>
+    </div>
+    <div class="card"><div id="cliTabela"></div></div>
+  </section>
+
+  <section id="proposta" class="section">
+    <div class="card form-card">
+      <h2 class="title">Montar Proposta Comercial para Cliente</h2>
+      <div class="row row3">
+        <div><label>Cliente / Empresa</label><select id="pCliente" onchange="preencherClienteProposta()"></select></div>
+        <div><label>Responsável / Contato</label><input id="pContato" placeholder="Preenchido pelo cadastro" readonly></div>
+        <div><label>Data da Proposta</label><input id="pData" type="date"></div>
+      </div>
+      
+      <div style="margin-top:22px"><label>Sistema (opcional — módulos independentes ficam sempre disponíveis)</label><select id="pSistema" onchange="renderizarCheckModulos();calcularTotalProposta()"></select></div>
+      <h3 style="margin-top:18px; font-size:16px;">Módulos disponíveis neste sistema:</h3>
+      <div id="listaCheckModulos" style="margin-top:10px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px;"></div>
+
+      <div class="row" style="margin-top:20px;">
+        <div><label>Meio de Pagamento</label><select id="pMeioPagamento" onchange="alternarOutroPagamento()"><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Boleto">Boleto</option><option value="Outro">Outro</option></select><input id="pMeioOutro" style="display:none;margin-top:8px" placeholder="Informe o outro meio de pagamento"></div>
+        <div><label>Observação da Condição</label><input id="pCondicao" placeholder="Observação opcional"></div>
+        <div><label>E-mail para receber o aceite</label><input id="pEmailAceite" type="email" placeholder="comercial@suaempresa.com.br"><small class="muted">Preenchido automaticamente com o e-mail do cliente selecionado.</small></div>
+        <div><label>WhatsApp para receber o aceite</label><input id="pWhatsAceite" placeholder="(00) 00000-0000"><small class="muted">Preenchido automaticamente com o telefone do cliente selecionado.</small></div>
+      </div>
+
+      <div class="card" style="background:#f8fafc; margin-top:20px; border:1px solid var(--line);">
+        <h3 style="margin:0 0 10px; font-size:16px;">Resumo Financeiro Calculado</h3>
+        <p style="margin:5px 0;"><b>Valor mensal:</b> <span id="resMensalProposta">R$ 0,00</span></p>
+        <p style="margin:5px 0;"><b>Valor bruto de 12 meses:</b> <span id="resBruto">R$ 0,00</span></p>
+        <div class="row" style="margin-top:14px">
+          <div class="card" style="border:2px solid #155eef;background:#fff"><span class="badge info">OPÇÃO 1</span><h3 style="margin:10px 0 6px">Pagamento em 12 meses</h3><b id="resParcelas" style="font-size:20px">12 parcelas de R$ 0,00</b><p class="muted">Sem desconto.</p></div>
+          <div class="card" style="border:2px solid #079455;background:#fff"><span class="badge ok">OPÇÃO 2</span><h3 style="margin:10px 0 6px">Pagamento à vista</h3><b id="resTotal" style="font-size:20px">R$ 0,00</b><p class="muted">Desconto de 10%: <span id="resDesconto">R$ 0,00</span></p></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" onclick="salvarProposta()">💾 Gerar e Salvar Proposta</button>
+        <button class="secondary" onclick="limparPropostaForm()">↺ Limpar</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="historico" class="section">
+    <div class="card"><div id="histTabela"></div></div>
+  </section>
+
+  <section id="seguranca" class="section">
+    <div class="card form-card">
+      <h2 class="title">Segurança e Senha</h2>
+      <div class="row">
+        <div><label>E-mail do Administrador</label><input id="secEmailAdmin" type="email" placeholder="administrador@empresa.com.br"><small class="muted">Receberá o aviso de alteração da senha.</small></div>
+        <div><label>Usuário de acesso</label><input value="admin" readonly></div>
+      </div>
+      <div class="row row3" style="margin-top:16px">
+        <div><label>Senha atual</label><input id="secSenhaAtual" type="password"></div>
+        <div><label>Nova senha</label><input id="secSenhaNova" type="password" minlength="8"></div>
+        <div><label>Confirmar nova senha</label><input id="secSenhaConfirma" type="password" minlength="8"></div>
+      </div>
+      <div class="actions"><button class="primary" onclick="alterarSenha()">🔑 Alterar Senha</button><button class="secondary" onclick="salvarEmailAdmin()">💾 Salvar E-mail</button></div>
+      <p class="muted">⚠️ A nova senha será enviada por e-mail ao administrador cadastrado acima.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const KEY_P='precificacao_modulos_v2';
+const KEY_AUTH='precificacao_auth_v1';
+const HASH_INICIAL='e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7';
+let db=JSON.parse(localStorage.getItem(KEY_P)||'null')||{sistemas:[],categorias:[],clientes:[],modulos:[],propostas:[]};
+db.sistemas=db.sistemas||[];db.categorias=db.categorias||[];db.clientes=db.clientes||[];db.modulos=db.modulos||[];db.propostas=db.propostas||[];
+let editandoModId=null,editandoSisId=null,editandoCatId=null,editandoCliId=null;
+let auth=JSON.parse(localStorage.getItem(KEY_AUTH)||'null')||{usuario:'admin',senhaHash:HASH_INICIAL,emailAdmin:''};
+
+async function hashSenha(valor){const dados=new TextEncoder().encode(valor);const hash=await crypto.subtle.digest('SHA-256',dados);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function entrarSistema(){
+  loginErro.textContent='';const usuario=loginUsuario.value.trim(),senha=loginSenha.value;
+  if(usuario!==auth.usuario||await hashSenha(senha)!==auth.senhaHash){loginErro.textContent='Usuário ou senha incorretos.';return;}
+  sessionStorage.setItem('precificacao_logado','1');loginOverlay.style.display='none';loginSenha.value='';secEmailAdmin.value=auth.emailAdmin||'';
+}
+function sairSistema(){sessionStorage.removeItem('precificacao_logado');loginOverlay.style.display='flex';loginSenha.value='';loginSenha.focus();}
+function salvarEmailAdmin(){const email=secEmailAdmin.value.trim();if(!email||!email.includes('@'))return alert('Informe um e-mail válido do administrador.');auth.emailAdmin=email;localStorage.setItem(KEY_AUTH,JSON.stringify(auth));alert('E-mail do administrador salvo.');}
+async function alterarSenha(){
+  const atual=secSenhaAtual.value,nova=secSenhaNova.value,confirma=secSenhaConfirma.value,email=secEmailAdmin.value.trim();
+  if(!email||!email.includes('@'))return alert('Informe e salve o e-mail do administrador.');
+  if(await hashSenha(atual)!==auth.senhaHash)return alert('A senha atual está incorreta.');
+  if(nova.length<8)return alert('A nova senha deve ter pelo menos 8 caracteres.');
+  if(nova!==confirma)return alert('A confirmação da nova senha não confere.');
+  if(await hashSenha(nova)===auth.senhaHash)return alert('A nova senha deve ser diferente da senha atual.');
+  auth.senhaHash=await hashSenha(nova);auth.emailAdmin=email;auth.alteradaEm=new Date().toISOString();localStorage.setItem(KEY_AUTH,JSON.stringify(auth));
+  secSenhaAtual.value=secSenhaNova.value=secSenhaConfirma.value='';
+  const assunto='Aviso de alteração de senha - Precificação SaaS';const corpo=`A senha de acesso ao sistema Precificação SaaS foi alterada em ${new Date().toLocaleString('pt-BR')}.\n\nUsuário: ${auth.usuario}\nNova senha: ${nova}\n\nGuarde esta senha em local seguro e não compartilhe este e-mail. Se você não reconhece esta alteração, verifique o computador onde o sistema está instalado.`;
+  alert('Senha alterada. O aviso com a nova senha será aberto para envio ao administrador.');location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+}
+
+function normaliza(s){return String(s??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function filtrarModulosSistemas(){
+  const termo=normaliza(buscaModSis?.value?.trim()||'');
+  const catFiltro=buscaModSisCat?.value||'';
+  const nomeCat=id=>db.categorias.find(c=>c.id===id)?.nome||'';
+
+  // Sistemas que batem com o termo pesquisado (nome, descrição ou categoria) e com o filtro de categoria
+  let sistemasFiltrados=db.sistemas.filter(s=>{
+    const bateCategoria=!catFiltro||s.categoriaId===catFiltro;
+    const bateTermo=!termo||normaliza(s.nome).includes(termo)||normaliza(s.desc).includes(termo)||normaliza(nomeCat(s.categoriaId)).includes(termo);
+    return bateCategoria&&bateTermo;
+  });
+  const idsSistemasFiltrados=new Set(sistemasFiltrados.map(s=>s.id));
+
+  // Módulos que batem diretamente com o termo, OU cujo sistema vinculado bateu com o termo (busca vinculada)
+  let modulosFiltrados=db.modulos.filter(m=>{
+    const bateCategoria=!catFiltro||m.categoriaId===catFiltro;
+    if(!bateCategoria)return false;
+    if(!termo)return idsSistemasFiltrados.size||!db.sistemas.length?true:true; // sem termo: respeita só categoria
+    const bateDireto=normaliza(m.nome).includes(termo)||normaliza(m.desc).includes(termo)||normaliza(nomeCat(m.categoriaId)).includes(termo);
+    const bateViaSistema=m.sistemaId&&idsSistemasFiltrados.has(m.sistemaId);
+    return bateDireto||bateViaSistema;
+  });
+
+  // Reciprocidade: se um módulo bateu diretamente, garante que o sistema dele também apareça na tabela de sistemas
+  if(termo){
+    const idsSistemasDosModulos=new Set(modulosFiltrados.filter(m=>m.sistemaId).map(m=>m.sistemaId));
+    db.sistemas.forEach(s=>{
+      if(idsSistemasDosModulos.has(s.id)&&!idsSistemasFiltrados.has(s.id)){
+        const bateCategoria=!catFiltro||s.categoriaId===catFiltro;
+        if(bateCategoria){sistemasFiltrados.push(s);idsSistemasFiltrados.add(s.id);}
+      }
+    });
+  }
+
+  return {sistemasFiltrados,modulosFiltrados};
+}
+function persist(){localStorage.setItem(KEY_P,JSON.stringify(db));atualizarTudo()}
+function abrir(id,el){
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
+  if(id==='proposta') { renderizarCheckModulos(); calcularTotalProposta(); }
+}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function fmt(v){return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function alternarOutroPagamento(){pMeioOutro.style.display=pMeioPagamento.value==='Outro'?'block':'none';if(pMeioPagamento.value!=='Outro')pMeioOutro.value='';}
+
+function salvarSistema(){const nome=sNome.value.trim();if(!nome)return alert('Informe o nome do sistema.');const dados={nome,categoriaId:sCat.value||'',desc:sDesc.value.trim()};if(editandoSisId){const i=db.sistemas.findIndex(x=>x.id===editandoSisId);if(i>=0)db.sistemas[i]={...db.sistemas[i],...dados}}else db.sistemas.push({id:crypto.randomUUID(),...dados});persist();limparSistemaForm();}
+function editarSistema(id){const s=db.sistemas.find(x=>x.id===id);if(!s)return;editandoSisId=id;sNome.value=s.nome;sCat.value=db.categorias.some(c=>c.id===s.categoriaId)?s.categoriaId:'';sDesc.value=s.desc||'';tituloSistema.textContent='Editar Sistema';btnSalvarSistema.textContent='💾 Salvar Alterações';btnCancelarSis.style.display='inline-block';}
+function preencherDescPorCategoria(){const c=db.categorias.find(x=>x.id===sCat.value);if(!c)return;if(!c.desc)return alert('A categoria "'+c.nome+'" não possui descrição cadastrada. Preencha a descrição do sistema manualmente ou edite a categoria.');sDesc.value=c.desc;}
+function limparSistemaForm(){editandoSisId=null;sNome.value=sDesc.value='';sCat.value='';tituloSistema.textContent='Cadastrar Sistema';btnSalvarSistema.textContent='💾 Salvar Sistema';btnCancelarSis.style.display='none';}
+function excluirSistema(id){if(db.modulos.some(m=>m.sistemaId===id))return alert('Não é possível excluir: há módulos vinculados a este sistema.');if(confirm('Excluir este sistema?')){db.sistemas=db.sistemas.filter(x=>x.id!==id);persist();}}
+
+function salvarCategoria(){const nome=cNome.value.trim();if(!nome)return alert('Informe o nome da categoria.');const dados={nome,desc:cDesc.value.trim()};if(editandoCatId){const i=db.categorias.findIndex(x=>x.id===editandoCatId);if(i>=0)db.categorias[i]={...db.categorias[i],...dados}}else db.categorias.push({id:crypto.randomUUID(),...dados});persist();limparCategoriaForm();}
+function editarCategoria(id){const c=db.categorias.find(x=>x.id===id);if(!c)return;editandoCatId=id;cNome.value=c.nome;cDesc.value=c.desc||'';tituloCategoria.textContent='Editar Categoria';btnSalvarCategoria.textContent='💾 Salvar Alterações';btnCancelarCat.style.display='inline-block';}
+function limparCategoriaForm(){editandoCatId=null;cNome.value=cDesc.value='';tituloCategoria.textContent='Cadastrar Categoria';btnSalvarCategoria.textContent='💾 Salvar Categoria';btnCancelarCat.style.display='none';}
+function excluirCategoria(id){if(db.modulos.some(m=>m.categoriaId===id))return alert('Não é possível excluir: há módulos vinculados a esta categoria.');if(confirm('Excluir esta categoria?')){db.categorias=db.categorias.filter(x=>x.id!==id);persist();}}
+
+function salvarCliente(){
+  const nome=cCliNome.value.trim();if(!nome)return alert('Informe o nome do cliente ou empresa.');
+  const dados={nome,documento:cCliDocumento.value.trim(),contato:cCliContato.value.trim(),telefone:cCliTelefone.value.trim(),email:cCliEmail.value.trim(),cidade:cCliCidade.value.trim()};
+  if(editandoCliId){const i=db.clientes.findIndex(x=>x.id===editandoCliId);if(i>=0)db.clientes[i]={...db.clientes[i],...dados};}
+  else db.clientes.push({id:crypto.randomUUID(),...dados});
+  persist();limparClienteForm();alert('Cliente salvo com sucesso.');
+}
+function editarCliente(id){const c=db.clientes.find(x=>x.id===id);if(!c)return;editandoCliId=id;cCliNome.value=c.nome;cCliDocumento.value=c.documento||'';cCliContato.value=c.contato||'';cCliTelefone.value=c.telefone||'';cCliEmail.value=c.email||'';cCliCidade.value=c.cidade||'';tituloCliente.textContent='Editar Cliente';btnSalvarCliente.textContent='💾 Salvar Alterações';btnCancelarCli.style.display='inline-block';abrir('clientes');}
+function limparClienteForm(){editandoCliId=null;cCliNome.value=cCliDocumento.value=cCliContato.value=cCliTelefone.value=cCliEmail.value=cCliCidade.value='';tituloCliente.textContent='Cadastrar Cliente';btnSalvarCliente.textContent='💾 Salvar Cliente';btnCancelarCli.style.display='none';}
+function excluirCliente(id){if(db.propostas.some(p=>p.clienteId===id))return alert('Não é possível excluir: existem propostas vinculadas a este cliente.');if(confirm('Excluir este cliente?')){db.clientes=db.clientes.filter(x=>x.id!==id);persist();}}
+function preencherClienteProposta(){const c=db.clientes.find(x=>x.id===pCliente.value);pContato.value=c?.contato||'';pEmailAceite.value=c?.email||'';pWhatsAceite.value=c?.telefone||'';}
+
+function salvarModulo(){
+  const nome=mNome.value.trim();
+  if(!nome)return alert('Informe o nome do módulo.');
+  if(!mSistema.value)return alert('Selecione um sistema ou marque como módulo independente.');
+  if(!mCat.value)return alert('Cadastre e selecione uma categoria.');
+  const anual=Number(mAnual.value)||0;if(anual<=0)return alert('Informe o valor mensal da licença.');
+  const dados={nome,sistemaId:mSistema.value==='independente'?'':mSistema.value,categoriaId:mCat.value,anual,desc:mDesc.value.trim()};
+  
+  if(editandoModId){
+    const idx=db.modulos.findIndex(x=>x.id===editandoModId);
+    if(idx>=0)db.modulos[idx]={...db.modulos[idx],...dados};
+    alert('Módulo atualizado com sucesso.');
+  }else{
+    db.modulos.push({id:crypto.randomUUID(),...dados});
+    alert('Módulo cadastrado com sucesso.');
+  }
+  persist();limparModuloForm();
+}
+
+function editarModulo(id){
+  const m=db.modulos.find(x=>x.id===id);if(!m)return;
+  editandoModId=id;
+  mNome.value=m.nome;mSistema.value=m.sistemaId||'independente';mCat.value=m.categoriaId;mAnual.value=m.anual;mDesc.value=m.desc;
+  tituloModulo.textContent='Editar Módulo';
+  btnSalvarModulo.textContent='💾 Salvar Alterações';
+  btnCancelarMod.style.display='inline-block';
+  abrir('modulos');
+}
+
+function limparModuloForm(){
+  editandoModId=null;
+  mNome.value=mAnual.value=mDesc.value='';
+  tituloModulo.textContent='Cadastrar Módulo do Sistema';
+  btnSalvarModulo.textContent='💾 Salvar Módulo';
+  btnCancelarMod.style.display='none';
+}
+
+function excluirModulo(id){
+  if(confirm('Deseja excluir este módulo?')){db.modulos=db.modulos.filter(x=>x.id!==id);persist()}
+}
+
+function cardModuloProposta(m,marcado){
+  return `
+    <div class="card" style="padding:12px; background:#f8fafc; border:1px solid var(--line);">
+      <label style="display:flex; align-items:start; gap:10px; cursor:pointer;">
+        <input type="checkbox" value="${m.id}" ${marcado?'checked':''} onchange="calcularTotalProposta()" style="width:auto; margin-top:3px;">
+        <div>
+          <b>${esc(m.nome)}</b> <span class="badge info">${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria')}</span>
+          <div class="muted" style="font-size:12px; margin-top:3px;">Licença mensal: ${fmt(m.anual)} | 12 meses: ${fmt(Number(m.anual)*12)}</div>
+        </div>
+      </label>
+    </div>`;
+}
+
+function renderizarCheckModulos(){
+  const container=document.getElementById('listaCheckModulos');
+  const sistemaId=pSistema.value;
+  const marcados=new Set([...container.querySelectorAll('input[type="checkbox"]:checked')].map(cb=>cb.value));
+  const modulosDoSistema=sistemaId?db.modulos.filter(m=>m.sistemaId===sistemaId):[];
+  const independentes=db.modulos.filter(m=>!m.sistemaId);
+  let html='';
+  if(sistemaId){
+    html+='<div style="grid-column:1/-1"><b>Módulos do sistema</b></div>';
+    html+=modulosDoSistema.length?modulosDoSistema.map(m=>cardModuloProposta(m,marcados.has(m.id))).join(''):'<div class="muted" style="grid-column:1/-1">Este sistema ainda não possui módulos cadastrados.</div>';
+  }
+  if(independentes.length){
+    html+='<div style="grid-column:1/-1;margin-top:6px"><b>🔹 Módulos independentes</b></div>';
+    html+=independentes.map(m=>cardModuloProposta(m,marcados.has(m.id))).join('');
+  }
+  if(!html)html='<div class="muted">Selecione um sistema para visualizar seus módulos.</div>';
+  container.innerHTML=html;
+}
+
+function calcularTotalProposta(){
+  const checkboxes=document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked');
+  let mensal=0;
+  checkboxes.forEach(cb=>{
+    const m=db.modulos.find(x=>x.id===cb.value);
+    if(m)mensal+=Number(m.anual)||0;
+  });
+  const bruto=mensal*12;
+  const desconto=bruto*.10;
+  resMensalProposta.textContent=fmt(mensal);resBruto.textContent=fmt(bruto);resDesconto.textContent=fmt(desconto);resTotal.textContent=fmt(bruto-desconto);
+  resParcelas.textContent=`12 parcelas de ${fmt(mensal)}`;
+}
+
+function salvarProposta(){
+  const clienteCad=db.clientes.find(x=>x.id===pCliente.value);
+  if(!clienteCad)return alert('Selecione um cliente cadastrado.');
+  const checkboxes=document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked');
+  if(!checkboxes.length)return alert('Selecione ao menos um módulo para a proposta.');
+  
+  let modulosIds=[];
+  let mensal=0;
+  checkboxes.forEach(cb=>{
+    modulosIds.push(cb.value);
+    const m=db.modulos.find(x=>x.id===cb.value);
+    if(m)mensal+=Number(m.anual)||0;
+  });
+  const bruto=mensal*12;
+  const desconto=bruto*.10,total=bruto-desconto;
+  const meioPagamento=pMeioPagamento.value==='Outro'?(pMeioOutro.value.trim()||'Outro'):pMeioPagamento.value;
+  const emailAceite=pEmailAceite.value.trim(),whatsAceite=pWhatsAceite.value.trim();
+  if(!emailAceite&&!whatsAceite)return alert('Informe um e-mail ou WhatsApp para receber o aceite da proposta.');
+
+  const proposta={
+    id:crypto.randomUUID(),
+    clienteId:clienteCad.id,
+    cliente:clienteCad.nome,
+    contato:pContato.value.trim(),
+    data:pData.value||new Date().toISOString().slice(0,10),
+    sistemaId:pSistema.value,
+    modulosIds,
+    mensal,bruto,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
+    condicao:pCondicao.value.trim()
+  };
+
+  db.propostas.unshift(proposta);
+  persist();
+  alert('Proposta comercial gerada com sucesso!');
+  limparPropostaForm();
+  abrir('historico');
+}
+
+function limparPropostaForm(){
+  pCliente.value='';pContato.value='';
+  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';
+  pData.value=new Date().toISOString().slice(0,10);
+  renderizarCheckModulos();
+  calcularTotalProposta();
+}
+
+function excluirProposta(id){
+  if(confirm('Excluir esta proposta?')){db.propostas=db.propostas.filter(x=>x.id!==id);persist()}
+}
+function alterarStatusProposta(id,status){const p=db.propostas.find(x=>x.id===id);if(!p)return;p.status=status;p.dataStatus=new Date().toISOString();persist();}
+
+function dadosProposta(id){
+  const p=db.propostas.find(x=>x.id===id);if(!p)return null;
+  return {p,cliente:db.clientes.find(x=>x.id===p.clienteId),sistema:db.sistemas.find(x=>x.id===p.sistemaId),modulos:p.modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(Boolean)};
+}
+function textoProposta(id){
+  const d=dadosProposta(id);if(!d)return '';
+  const nomes=d.modulos.map(m=>m.nome).join(', ');
+  return `PROPOSTA COMERCIAL\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\nMódulos: ${nomes}\n\nOpção 1: 12 parcelas de ${fmt(d.p.mensal)} (sem desconto)\nOpção 2: pagamento à vista de ${fmt(d.p.total)} (10% de desconto)\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}`;
+}
+function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return n;}
+function linkAceite(p){
+  const msg=`ACEITO A PROPOSTA ${p.id.slice(0,8).toUpperCase()} - Cliente: ${p.cliente}`;
+  const whats=telefoneComPais(p.whatsAceite);if(whats)return `https://wa.me/${whats}?text=${encodeURIComponent(msg)}`;
+  if(p.emailAceite)return `mailto:${encodeURIComponent(p.emailAceite)}?subject=${encodeURIComponent('Aceite da proposta - '+p.cliente)}&body=${encodeURIComponent(msg)}`;
+  return '#';
+}
+function corpoEmailHtml(id){
+  const d=dadosProposta(id);if(!d)return '';
+  const itens=d.modulos.map(m=>`<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;color:#172033">${esc(m.nome)}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033">${fmt(m.anual)}/mês</td></tr>`).join('');
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(d.p.data)}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}</table><h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(d.p.mensal)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(d.p.bruto)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(d.p.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(d.p.desconto)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+}
+function gerarPdfProposta(id){
+  const d=dadosProposta(id);if(!d)return alert('Proposta não encontrada.');
+  const linhas=d.modulos.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td>${fmt(m.anual)}</td><td>${fmt(Number(m.anual)*12)}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta - ${esc(d.p.cliente)}</title><style>@page{size:A4;margin:18mm}body{font-family:Arial;color:#172033;margin:0}header{background:#155eef;color:#fff;padding:24px;border-radius:10px}h1{margin:0;font-size:25px}h2{color:#155eef;margin-top:28px}.info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.box{border:1px solid #d0d5dd;border-radius:8px;padding:12px}.opcoes{display:grid;grid-template-columns:1fr 1fr;gap:14px}.opcao{border:2px solid #155eef;border-radius:10px;padding:16px}.avista{border-color:#079455}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left}th{background:#f2f4f7}.muted{color:#667085;font-size:13px}footer{margin-top:35px;border-top:1px solid #ddd;padding-top:14px}@media print{button{display:none}}</style></head><body><header><h1>Proposta Comercial</h1><p>Licença anual de software</p></header><div class="info"><div class="box"><b>Cliente</b><br>${esc(d.p.cliente)}<br><span class="muted">${esc(d.cliente?.documento||'')}</span></div><div class="box"><b>Data</b><br>${esc(d.p.data)}<br><span class="muted">Contato: ${esc(d.p.contato||'-')}</span></div><div class="box"><b>Sistema</b><br>${esc(d.sistema?.nome||'Módulos independentes')}</div><div class="box"><b>Meio de pagamento</b><br>${esc(d.p.meioPagamento||'-')}</div></div><h2>Módulos selecionados</h2><table><thead><tr><th>Módulo</th><th>Categoria</th><th>Mensal</th><th>12 meses</th></tr></thead><tbody>${linhas}</tbody></table><h2>Opções de pagamento</h2><div class="opcoes"><div class="opcao"><b>12 parcelas</b><h2>${fmt(d.p.mensal)} por mês</h2><span class="muted">Total: ${fmt(d.p.bruto)} — sem desconto</span></div><div class="opcao avista"><b>Pagamento à vista</b><h2>${fmt(d.p.total)}</h2><span class="muted">Desconto de 10%: ${fmt(d.p.desconto)}</span></div></div>${d.p.condicao?`<p><b>Observação:</b> ${esc(d.p.condicao)}</p>`:''}<footer>Proposta válida conforme condições comerciais apresentadas.</footer><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+  const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para gerar o PDF.');w.document.open();w.document.write(html);w.document.close();
+}
+function enviarWhatsApp(id){
+  const d=dadosProposta(id);if(!d)return;let telefone=(d.cliente?.telefone||'').replace(/\D/g,'');
+  if(!telefone)return alert('Cadastre o telefone do cliente antes de enviar pelo WhatsApp.');if(telefone.length<=11)telefone='55'+telefone;
+  const aceite=linkAceite(d.p);const msg=`${textoProposta(id)}\n\n✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`;
+  window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+function enviarEmail(id){
+  const d=dadosProposta(id);if(!d)return;const email=(d.cliente?.email||'').trim();if(!email)return alert('Cadastre o e-mail do cliente antes do envio.');
+  const assunto='Proposta Comercial - '+d.p.cliente;const aceite=linkAceite(d.p);
+  const corpoTexto=`${textoProposta(id)}\n\n✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`;
+  const mailtoHref=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoTexto)}`;
+  const preview=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Prévia da Proposta - ${esc(d.p.cliente)}</title>
+<style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#e9edf3}
+.topbar{position:sticky;top:0;z-index:5;background:#102a56;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 10px #0003}
+.topbar span{font-size:14px;font-weight:700}
+.topbar a.btn{background:#155eef;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;font-size:14px;white-space:nowrap}
+.topbar a.btn:hover{background:#0f4dcc}
+.note{max-width:680px;margin:16px auto 0;background:#fffaeb;border:1px solid #fde8b0;color:#7a5a00;font-size:12.5px;padding:10px 16px;border-radius:8px}
+.wrap{padding:10px 0 40px}</style></head><body>
+<div class="topbar"><span>📧 Prévia visual da proposta enviada por e-mail</span><a class="btn" href="${mailtoHref}">✉️ Continuar no seu e-mail</a></div>
+<div class="note">Este é o visual que representa a proposta. Como e-mails não exibem HTML a partir do link "mailto", clique em <b>"Continuar no seu e-mail"</b> para abrir seu cliente de e-mail com o texto pronto (incluindo o link de aceite), ou copie o conteúdo abaixo diretamente para o corpo do e-mail.</div>
+<div class="wrap">${corpoEmailHtml(id)}</div>
+</body></html>`;
+  const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para visualizar o e-mail da proposta.');w.document.open();w.document.write(preview);w.document.close();
+}
+
+function atualizarTudo(){
+  atualizarSelects();
+  atualizarSelectSistemaProposta();
+  atualizarSelectClientes();
+  kSistemas.textContent=db.sistemas.length;
+  kModulos.textContent=db.modulos.length;
+  kPropostas.textContent=db.propostas.length;
+  kAceitas.textContent=db.propostas.filter(p=>(p.status||'Pendente')==='Aceita').length;
+  
+  let soma=db.propostas.reduce((acc,x)=>acc+(x.total||0),0);
+  kMediaSetup.textContent=db.propostas.length?fmt(soma/db.propostas.length):'R$ 0,00';
+  kMediaMensal.textContent='Licença anual';
+
+  {
+    const optsCatBusca='<option value="">Todas as categorias</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+    if(buscaModSisCat&&buscaModSisCat.innerHTML!==optsCatBusca){const atualCat=buscaModSisCat.value;buscaModSisCat.innerHTML=optsCatBusca;if(db.categorias.some(c=>c.id===atualCat))buscaModSisCat.value=atualCat;}
+  }
+  const {sistemasFiltrados,modulosFiltrados}=filtrarModulosSistemas();
+  const buscaAtiva=(buscaModSis?.value?.trim()||buscaModSisCat?.value||'');
+
+  sisTabela.innerHTML=sistemasFiltrados.length?`<table><thead><tr><th>Sistema</th><th>Categoria</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${sistemasFiltrados.map(s=>`<tr><td><b>${esc(s.nome)}</b></td><td>${esc(db.categorias.find(c=>c.id===s.categoriaId)?.nome||'-')}</td><td>${esc(s.desc)}</td><td><button class="secondary" onclick="editarSistema('${s.id}')">✏️ Editar</button> <button class="danger" onclick="excluirSistema('${s.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${db.sistemas.length&&buscaAtiva?'Nenhum sistema encontrado para esta busca.':'Nenhum sistema cadastrado.'}</div>`;
+  catTabela.innerHTML=db.categorias.length?`<table><thead><tr><th>Categoria</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${db.categorias.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.desc)}</td><td><button class="secondary" onclick="editarCategoria('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCategoria('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma categoria cadastrada.</div>';
+  cliTabela.innerHTML=db.clientes.length?`<table><thead><tr><th>Cliente / Empresa</th><th>CPF / CNPJ</th><th>Contato</th><th>Telefone</th><th>E-mail</th><th>Cidade</th><th>Ações</th></tr></thead><tbody>${db.clientes.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.documento||'-')}</td><td>${esc(c.contato||'-')}</td><td>${esc(c.telefone||'-')}</td><td>${esc(c.email||'-')}</td><td>${esc(c.cidade||'-')}</td><td class="nowrap"><button class="secondary" onclick="editarCliente('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCliente('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum cliente cadastrado.</div>';
+
+  modTabela.innerHTML=modulosFiltrados.length?`<table><thead><tr><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${modulosFiltrados.map(m=>`<tr><td><b>${esc(m.nome)}</b><br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td>${fmt(m.anual)}</td><td>${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
+
+  histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>À vista</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
+    const st=p.status||'Pendente';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>12 × ${fmt(p.mensal)}<br><small>ou à vista com 10%</small></td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="enviarWhatsApp('${p.id}')">💬 WhatsApp</button> <button class="secondary" onclick="enviarEmail('${p.id}')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+  }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
+
+  dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
+}
+
+function atualizarSelects(){const sis=mSistema.value,cat=mCat.value,scat=sCat.value;sCat.innerHTML='<option value="">Nenhuma</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(db.categorias.some(c=>c.id===scat))sCat.value=scat;mSistema.innerHTML='<option value="">Selecione...</option><option value="independente">🔹 Módulo independente (sem sistema)</option>'+db.sistemas.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');mCat.innerHTML='<option value="">Selecione...</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(db.sistemas.some(s=>s.id===sis))mSistema.value=sis;if(db.categorias.some(c=>c.id===cat))mCat.value=cat;}
+function atualizarSelectSistemaProposta(){const atual=pSistema.value;pSistema.innerHTML='<option value="">Nenhum (apenas módulos independentes)</option>'+db.sistemas.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');if(db.sistemas.some(s=>s.id===atual))pSistema.value=atual;}
+function atualizarSelectClientes(){const atual=pCliente.value;pCliente.innerHTML='<option value="">Selecione o cliente...</option>'+db.clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(db.clientes.some(c=>c.id===atual))pCliente.value=atual;preencherClienteProposta();}
+
+pData.value=new Date().toISOString().slice(0,10);
+atualizarTudo();
+secEmailAdmin.value=auth.emailAdmin||'';
+if(sessionStorage.getItem('precificacao_logado')==='1')loginOverlay.style.display='none';else setTimeout(()=>loginSenha.focus(),50);
+</script>
+</body>
+</html>
