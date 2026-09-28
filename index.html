@@ -128,6 +128,9 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
 @media(max-width:800px){.header-actions{gap:6px}.hdr-btn{width:44px;height:44px}}
 @media(max-width:420px){.hdr-btn{width:40px;height:40px;font-size:17px}.nova-btn{width:40px!important;height:40px!important}header{gap:6px!important}}
 @media(prefers-reduced-motion:reduce){.card-mod{transition:none}}
+.aviso-volume{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600;background:#eff8ff;color:#175cd3;border:1px solid #d1e9ff}
+.aviso-volume.ativo{background:#ecfdf3;color:#027a48;border-color:#abefc6}.aviso-volume:empty{display:none}
+html[data-theme="dark"] .aviso-volume{background:#172f5c;color:#9dc2ff;border-color:#2a4a85}html[data-theme="dark"] .aviso-volume.ativo{background:#0f3a28;color:#6ce9a6;border-color:#1f6b4a}
 /* ===== Filtros, contadores e alteração em massa ===== */
 .filtro-rodape{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -337,9 +340,12 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
         <h3 style="margin:0 0 10px; font-size:16px;">Resumo Financeiro Calculado</h3>
         <p style="margin:5px 0;"><b>Valor mensal:</b> <span id="resMensalProposta">R$ 0,00</span></p>
         <p style="margin:5px 0;"><b>Valor bruto de 12 meses:</b> <span id="resBruto">R$ 0,00</span></p>
+        <p style="margin:5px 0;display:none" id="linhaDescVolume"><b>Desconto por volume (10% a partir de 10 módulos):</b> <span id="resDescVolume" style="color:#079455;font-weight:700">- R$ 0,00</span></p>
+        <p style="margin:5px 0;display:none" id="linhaSubtotal"><b>Valor do contrato com desconto:</b> <span id="resSubtotal">R$ 0,00</span></p>
+        <div id="avisoVolume" class="aviso-volume"></div>
         <div class="row" style="margin-top:14px">
-          <div class="card" style="border:2px solid #155eef;background:#fff"><span class="badge info">OPÇÃO 1</span><h3 style="margin:10px 0 6px">Pagamento em 12 meses</h3><b id="resParcelas" style="font-size:20px">12 parcelas de R$ 0,00</b><p class="muted">Sem desconto.</p></div>
-          <div class="card" style="border:2px solid #079455;background:#fff"><span class="badge ok">OPÇÃO 2</span><h3 style="margin:10px 0 6px">Pagamento à vista</h3><b id="resTotal" style="font-size:20px">R$ 0,00</b><p class="muted">Desconto de 10%: <span id="resDesconto">R$ 0,00</span></p></div>
+          <div class="card" style="border:2px solid #155eef;background:#fff"><span class="badge info">OPÇÃO 1</span><h3 style="margin:10px 0 6px">Pagamento em 12 meses</h3><b id="resParcelas" style="font-size:20px">12 parcelas de R$ 0,00</b><p class="muted" id="resParcelasObs">Sem desconto.</p></div>
+          <div class="card" style="border:2px solid #079455;background:#fff"><span class="badge ok">OPÇÃO 2</span><h3 style="margin:10px 0 6px">Pagamento à vista</h3><b id="resTotal" style="font-size:20px">R$ 0,00</b><p class="muted">Desconto de 10% à vista: <span id="resDesconto">R$ 0,00</span></p></div>
         </div>
       </div>
 
@@ -665,6 +671,23 @@ function renderizarCheckModulos(){
   container.innerHTML=html;
 }
 
+// ===== Regras de desconto =====
+const MIN_MODULOS_DESCONTO=10,PCT_DESCONTO_VOLUME=0.10,PCT_DESCONTO_AVISTA=0.10;
+function calcularCondicoes(mensal,qtd){
+  mensal=Number(mensal)||0;
+  const bruto=arred(mensal*12);
+  const temVolume=qtd>=MIN_MODULOS_DESCONTO;
+  const descontoVolume=temVolume?arred(bruto*PCT_DESCONTO_VOLUME):0;
+  const subtotal=arred(bruto-descontoVolume);
+  const parcela=arred(subtotal/12);
+  const desconto=arred(subtotal*PCT_DESCONTO_AVISTA);
+  return {mensal,bruto,qtd,temVolume,descontoVolume,subtotal,parcela,desconto,total:arred(subtotal-desconto)};
+}
+// Propostas antigas (antes desta regra) não têm os campos novos: usa os valores gravados
+function condicoesProposta(p){
+  if(p.parcela!=null)return {mensal:p.mensal,bruto:p.bruto,qtd:(p.modulosIds||[]).length,temVolume:!!p.descontoVolume,descontoVolume:p.descontoVolume||0,subtotal:p.subtotal,parcela:p.parcela,desconto:p.desconto,total:p.total};
+  return {mensal:p.mensal,bruto:p.bruto,qtd:(p.modulosIds||[]).length,temVolume:false,descontoVolume:0,subtotal:p.bruto,parcela:p.mensal,desconto:p.desconto,total:p.total};
+}
 function calcularTotalProposta(){
   const checkboxes=document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked');
   let mensal=0;
@@ -672,10 +695,16 @@ function calcularTotalProposta(){
     const m=db.modulos.find(x=>x.id===cb.value);
     if(m)mensal+=Number(m.anual)||0;
   });
-  const bruto=mensal*12;
-  const desconto=bruto*.10;
-  resMensalProposta.textContent=fmt(mensal);resBruto.textContent=fmt(bruto);resDesconto.textContent=fmt(desconto);resTotal.textContent=fmt(bruto-desconto);
-  resParcelas.textContent=`12 parcelas de ${fmt(mensal)}`;
+  const qtd=checkboxes.length,c=calcularCondicoes(mensal,qtd);
+  resMensalProposta.textContent=fmt(c.mensal);resBruto.textContent=fmt(c.bruto);
+  linhaDescVolume.style.display=linhaSubtotal.style.display=c.temVolume?'block':'none';
+  resDescVolume.textContent='- '+fmt(c.descontoVolume);resSubtotal.textContent=fmt(c.subtotal);
+  resDesconto.textContent=fmt(c.desconto);resTotal.textContent=fmt(c.total);
+  resParcelas.textContent=`12 parcelas de ${fmt(c.parcela)}`;
+  resParcelasObs.textContent=c.temVolume?'Já com 10% de desconto por volume.':'Sem desconto.';
+  if(!qtd){avisoVolume.textContent='';avisoVolume.className='aviso-volume';}
+  else if(c.temVolume){avisoVolume.textContent=`🎉 Desconto por volume aplicado: ${qtd} módulos selecionados (10% sobre o valor total).`;avisoVolume.className='aviso-volume ativo';}
+  else{const f=MIN_MODULOS_DESCONTO-qtd;avisoVolume.textContent=`💡 ${qtd} módulo(s) selecionado(s). ${f===1?'Falta 1 módulo':'Faltam '+f+' módulos'} para ganhar 10% de desconto por volume.`;avisoVolume.className='aviso-volume';}
   atualizarDescricoesSelecionados();
 }
 
@@ -744,8 +773,10 @@ function salvarProposta(){
     const m=db.modulos.find(x=>x.id===cb.value);
     if(m)mensal+=Number(m.anual)||0;
   });
-  const bruto=mensal*12;
-  const desconto=bruto*.10,total=bruto-desconto;
+  const semDesc=modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(m=>m&&!(m.desc||'').trim());
+  if(semDesc.length&&!confirm(`${semDesc.length} módulo(s) sem descrição cadastrada:\n\n• ${semDesc.map(m=>m.nome).join('\n• ')}\n\nA proposta mostra a descrição de cada módulo. Deseja gerar mesmo assim?`))return;
+  const cond=calcularCondicoes(mensal,modulosIds.length);
+  const {bruto,descontoVolume,subtotal,parcela,desconto,total}=cond;
   const meioPagamento=pMeioPagamento.value==='Outro'?(pMeioOutro.value.trim()||'Outro'):pMeioPagamento.value;
   const emailAceite=pEmailAceite.value.trim(),whatsAceite=pWhatsAceite.value.trim();
   if(!emailAceite&&!whatsAceite)return alert('Informe um e-mail ou WhatsApp para receber o aceite da proposta.');
@@ -759,7 +790,7 @@ function salvarProposta(){
     sistemaId:pSistema.value,
     modulosIds,
     valores:Object.fromEntries(modulosIds.map(id=>[id,Number(db.modulos.find(m=>m.id===id)?.anual)||0])),
-    mensal,bruto,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
+    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
 
@@ -789,8 +820,9 @@ function dadosProposta(id){
 }
 function textoProposta(id){
   const d=dadosProposta(id);if(!d)return '';
-  const nomes=d.modulos.map(m=>m.nome).join(', ');
-  return `PROPOSTA COMERCIAL\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\nMódulos: ${nomes}\n\nOpção 1: 12 parcelas de ${fmt(d.p.mensal)} (sem desconto)\nOpção 2: pagamento à vista de ${fmt(d.p.total)} (10% de desconto)\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}`;
+  const c=condicoesProposta(d.p);
+  const lista=d.modulos.map((m,i)=>`${i+1}. ${m.nome} (${fmt(m.anual)}/mês)`).join('\n');
+  return `PROPOSTA COMERCIAL Nº ${d.p.id.slice(0,8).toUpperCase()}\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\n\nMódulos (${d.modulos.length}):\n${lista}\n\nValor de 12 meses: ${fmt(c.bruto)}${c.temVolume?`\nDesconto por volume (10%): -${fmt(c.descontoVolume)}\nValor do contrato: ${fmt(c.subtotal)}`:''}\n\nOpção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)} (10% de desconto à vista)\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}\n\nA descrição completa de cada módulo está na proposta em PDF.`;
 }
 function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return n;}
 function linkAceite(p){
@@ -801,13 +833,150 @@ function linkAceite(p){
 }
 function corpoEmailHtml(id){
   const d=dadosProposta(id);if(!d)return '';
-  const itens=d.modulos.map(m=>`<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;color:#172033">${esc(m.nome)}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033">${fmt(m.anual)}/mês</td></tr>`).join('');
-  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(d.p.data)}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}</table><h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(d.p.mensal)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(d.p.bruto)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(d.p.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(d.p.desconto)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+  const c=condicoesProposta(d.p);
+  const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(m.anual)}/mês</td></tr>`).join('');
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(d.p.data)}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
+function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
 function gerarPdfProposta(id){
   const d=dadosProposta(id);if(!d)return alert('Proposta não encontrada.');
-  const linhas=d.modulos.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td>${fmt(m.anual)}</td><td>${fmt(Number(m.anual)*12)}</td></tr>`).join('');
-  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Proposta - ${esc(d.p.cliente)}</title><style>@page{size:A4;margin:18mm}body{font-family:Arial;color:#172033;margin:0}header{background:#155eef;color:#fff;padding:24px;border-radius:10px}h1{margin:0;font-size:25px}h2{color:#155eef;margin-top:28px}.info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.box{border:1px solid #d0d5dd;border-radius:8px;padding:12px}.opcoes{display:grid;grid-template-columns:1fr 1fr;gap:14px}.opcao{border:2px solid #155eef;border-radius:10px;padding:16px}.avista{border-color:#079455}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left}th{background:#f2f4f7}.muted{color:#667085;font-size:13px}footer{margin-top:35px;border-top:1px solid #ddd;padding-top:14px}@media print{button{display:none}}</style></head><body><header><h1>Proposta Comercial</h1><p>Licença anual de software</p></header><div class="info"><div class="box"><b>Cliente</b><br>${esc(d.p.cliente)}<br><span class="muted">${esc(d.cliente?.documento||'')}</span></div><div class="box"><b>Data</b><br>${esc(d.p.data)}<br><span class="muted">Contato: ${esc(d.p.contato||'-')}</span></div><div class="box"><b>Sistema</b><br>${esc(d.sistema?.nome||'Módulos independentes')}</div><div class="box"><b>Meio de pagamento</b><br>${esc(d.p.meioPagamento||'-')}</div></div><h2>Módulos selecionados</h2><table><thead><tr><th>Módulo</th><th>Categoria</th><th>Mensal</th><th>12 meses</th></tr></thead><tbody>${linhas}</tbody></table><h2>Opções de pagamento</h2><div class="opcoes"><div class="opcao"><b>12 parcelas</b><h2>${fmt(d.p.mensal)} por mês</h2><span class="muted">Total: ${fmt(d.p.bruto)} — sem desconto</span></div><div class="opcao avista"><b>Pagamento à vista</b><h2>${fmt(d.p.total)}</h2><span class="muted">Desconto de 10%: ${fmt(d.p.desconto)}</span></div></div>${d.p.condicao?`<p><b>Observação:</b> ${esc(d.p.condicao)}</p>`:''}<footer>Proposta válida conforme condições comerciais apresentadas.</footer><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+  const c=condicoesProposta(d.p);
+  const num=d.p.id.slice(0,8).toUpperCase();
+  const logo=document.querySelector('.login-logo')?.src||'';
+  const nomeCat=m=>db.categorias.find(x=>x.id===m.categoriaId)?.nome||'';
+  const cli=d.cliente||{};
+  const linhas=d.modulos.map((m,i)=>{
+    const desc=(m.desc||'').trim();
+    return `<tr><td class="n">${String(i+1).padStart(2,'0')}</td><td><div class="mod-nome">${esc(m.nome)}${nomeCat(m)?`<span class="cat">${esc(nomeCat(m))}</span>`:''}</div><p class="mod-desc${desc?'':' vazia'}">${desc?esc(desc):'Descrição não informada.'}</p></td><td class="v">${fmt(m.anual)}</td><td class="v">${fmt(Number(m.anual)*12)}</td></tr>`;
+  }).join('');
+  const contatoCli=[cli.email,cli.telefone].filter(Boolean).map(esc).join(' · ');
+  const css=`
+@page{size:A4;margin:14mm 14mm 16mm}
+*{box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:#1d2939;font-size:10.5pt;line-height:1.5;background:#e9edf3}
+.pagina{max-width:210mm;margin:24px auto;background:#fff;padding:16mm 15mm 14mm;box-shadow:0 8px 30px #10182822}
+.barra{position:sticky;top:0;z-index:5;background:#102a56;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px}
+.barra button{background:#fff;color:#102a56;border:0;border-radius:8px;padding:10px 18px;font-weight:700;cursor:pointer;font-size:14px}
+.topo{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:14px;border-bottom:3px solid #102a56}
+.topo img{height:46px;width:auto;display:block}
+.topo .marca-txt{font-size:20pt;font-weight:800;color:#102a56}
+.ident{text-align:right;font-size:9pt;color:#475467;line-height:1.55}
+.ident .tipo{font-size:8.5pt;letter-spacing:.14em;font-weight:700;color:#155eef}
+.ident .num{font-size:13pt;font-weight:800;color:#102a56;letter-spacing:.02em}
+.capa{padding:22px 0 18px}
+.eyebrow{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#155eef;font-weight:700}
+.capa h1{margin:6px 0 8px;font-size:21pt;line-height:1.2;color:#102a56;letter-spacing:-.01em}
+.capa p{margin:0;color:#475467;max-width:150mm}
+.partes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px}
+.parte{border:1px solid #e4e7ec;border-radius:8px;padding:12px 14px;background:#f8fafc}
+.parte h4{margin:0 0 6px;font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:#667085}
+.parte .nome{font-size:12pt;font-weight:700;color:#102a56}
+.parte .l{color:#475467;font-size:9.5pt}
+.parte dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:9.5pt}
+.parte dt{color:#667085}.parte dd{margin:0;font-weight:600;color:#1d2939}
+h2{display:flex;align-items:center;gap:10px;margin:24px 0 10px;font-size:12.5pt;color:#102a56;break-after:avoid}
+h2 span{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:#102a56;color:#fff;font-size:9pt}
+table{width:100%;border-collapse:collapse}
+.itens thead th{background:#102a56;color:#fff;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:8px 10px;font-weight:700}
+.itens thead th.v{text-align:right}
+.itens td{padding:10px;border-bottom:1px solid #e4e7ec;vertical-align:top}
+.itens tbody tr{break-inside:avoid}
+.itens tbody tr:nth-child(even) td{background:#fafbfc}
+.itens td.n{width:34px;color:#98a2b3;font-weight:700;font-size:9.5pt;padding-top:11px}
+.itens td.v{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;width:92px}
+.mod-nome{font-weight:700;color:#102a56;font-size:10.5pt}
+.cat{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:20px;background:#eef4ff;color:#155eef;font-size:7.5pt;font-weight:700;vertical-align:1px;letter-spacing:.03em}
+.mod-desc{margin:4px 0 0;color:#475467;font-size:9.5pt;line-height:1.55;white-space:pre-line}
+.mod-desc.vazia{color:#98a2b3;font-style:italic}
+.itens tr.total-row td{background:#fff!important;padding:10px;font-weight:800;color:#102a56;border-top:2px solid #102a56;text-align:right;white-space:nowrap}
+.itens tr.total-row td:first-child{text-align:left}
+.invest{display:grid;grid-template-columns:1fr 1fr;gap:12px;break-inside:avoid}
+.resumo td{padding:7px 0;border-bottom:1px dashed #d0d5dd;font-size:10pt}
+.resumo td.v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.resumo tr.desc td{color:#067647;font-weight:600}
+.resumo tr.tot td{border-bottom:0;border-top:2px solid #102a56;padding-top:9px;font-weight:800;color:#102a56;font-size:11pt}
+.selo{margin-top:10px;background:#ecfdf3;border:1px solid #abefc6;color:#067647;border-radius:8px;padding:9px 12px;font-size:9pt;line-height:1.45}
+.opcoes{display:grid;gap:10px}
+.opcao{border:1.5px solid #d0d5dd;border-radius:10px;padding:12px 14px;break-inside:avoid}
+.opcao .rot{font-size:8pt;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#155eef}
+.opcao .valor{font-size:17pt;font-weight:800;color:#102a56;margin:3px 0 1px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.opcao .obs{font-size:9pt;color:#667085}
+.opcao.destaque{border-color:#079455;background:#f6fef9}
+.opcao.destaque .rot{color:#067647}
+.cond{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.cond li{padding-left:16px;position:relative;color:#344054}
+.cond li:before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:2px;background:#155eef}
+.aceite{break-inside:avoid}
+.aceite p{color:#475467;margin:0 0 30px}
+.assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:10px}
+.assin div{border-top:1px solid #344054;padding-top:6px;font-size:9pt;color:#475467}
+.assin b{display:block;color:#1d2939;font-size:10pt}
+.local{margin-top:22px;font-size:9.5pt;color:#475467}
+.rodape{margin-top:26px;padding-top:10px;border-top:1px solid #e4e7ec;display:flex;justify-content:space-between;font-size:8pt;color:#98a2b3}
+@media print{body{background:#fff}.barra{display:none}.pagina{margin:0;padding:0;box-shadow:none;max-width:none}}
+@media(max-width:700px){.pagina{padding:18px;margin:0}.partes,.invest,.assin{grid-template-columns:1fr}}
+`;
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposta ${num} - ${esc(d.p.cliente)}</title><style>${css}</style></head><body>
+<div class="barra"><span>Proposta comercial nº ${num}</span><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>
+<div class="pagina">
+  <header class="topo">
+    <div>${logo?`<img src="${logo}" alt="Logo">`:'<div class="marca-txt">Proposta</div>'}</div>
+    <div class="ident"><div class="tipo">Proposta comercial</div><div class="num">Nº ${num}</div><div>Emitida em ${esc(dataBR(d.p.data))}</div></div>
+  </header>
+
+  <section class="capa">
+    <div class="eyebrow">Licenciamento de software · 12 meses</div>
+    <h1>${esc(d.sistema?.nome||'Módulos de software')} para ${esc(d.p.cliente)}</h1>
+    <p>Apresentamos o escopo dos módulos propostos, com a descrição das funcionalidades de cada um, o investimento e as condições comerciais para o licenciamento anual.</p>
+  </section>
+
+  <div class="partes">
+    <div class="parte"><h4>Preparada para</h4><div class="nome">${esc(d.p.cliente)}</div>${cli.documento?`<div class="l">CPF/CNPJ: ${esc(cli.documento)}</div>`:''}${d.p.contato?`<div class="l">A/C: ${esc(d.p.contato)}</div>`:''}${contatoCli?`<div class="l">${contatoCli}</div>`:''}${cli.cidade?`<div class="l">${esc(cli.cidade)}</div>`:''}</div>
+    <div class="parte"><h4>Resumo da proposta</h4><dl><dt>Sistema</dt><dd>${esc(d.sistema?.nome||'Módulos independentes')}</dd><dt>Módulos</dt><dd>${d.modulos.length}</dd><dt>Vigência</dt><dd>12 meses</dd><dt>Pagamento</dt><dd>${esc(d.p.meioPagamento||'-')}</dd></dl></div>
+  </div>
+
+  <h2><span>01</span>Escopo · módulos e funcionalidades</h2>
+  <table class="itens"><thead><tr><th>#</th><th>Módulo</th><th class="v">Mensal</th><th class="v">12 meses</th></tr></thead>
+    <tbody>${linhas}
+    <tr class="total-row"><td colspan="2">Total (${d.modulos.length} módulo${d.modulos.length===1?'':'s'})</td><td>${fmt(c.mensal)}</td><td>${fmt(c.bruto)}</td></tr></tbody>
+  </table>
+
+  <h2><span>02</span>Investimento</h2>
+  <div class="invest">
+    <div>
+      <table class="resumo">
+        <tr><td>Valor anual (12 × ${fmt(c.mensal)})</td><td class="v">${fmt(c.bruto)}</td></tr>
+        ${c.temVolume?`<tr class="desc"><td>Desconto por volume (10%)</td><td class="v">− ${fmt(c.descontoVolume)}</td></tr>`:''}
+        <tr class="tot"><td>Valor do contrato</td><td class="v">${fmt(c.subtotal)}</td></tr>
+      </table>
+      ${c.temVolume?`<div class="selo"><b>Desconto por volume aplicado.</b> Propostas a partir de ${MIN_MODULOS_DESCONTO} módulos recebem 10% de desconto sobre o valor total. Esta proposta inclui ${c.qtd} módulos.</div>`:''}
+    </div>
+    <div class="opcoes">
+      <div class="opcao"><div class="rot">Opção 1 · Parcelado</div><div class="valor">12 × ${fmt(c.parcela)}</div><div class="obs">Total de ${fmt(c.subtotal)}${c.temVolume?', já com desconto por volume':''}</div></div>
+      <div class="opcao destaque"><div class="rot">Opção 2 · À vista · 10% off</div><div class="valor">${fmt(c.total)}</div><div class="obs">Economia de ${fmt(c.desconto+c.descontoVolume)} sobre o valor anual</div></div>
+    </div>
+  </div>
+
+  <h2><span>03</span>Condições comerciais</h2>
+  <ul class="cond">
+    <li>Licença de uso dos módulos listados pelo período de 12 meses.</li>
+    <li>Meio de pagamento: <b>${esc(d.p.meioPagamento||'-')}</b>.</li>
+    <li>Pagamento à vista com 10% de desconto sobre o valor do contrato.</li>
+    <li>Desconto por volume de 10% para propostas a partir de ${MIN_MODULOS_DESCONTO} módulos${c.temVolume?' (aplicado nesta proposta)':''}.</li>
+    ${d.p.condicao?`<li>Observação: ${esc(d.p.condicao)}</li>`:''}
+  </ul>
+
+  <section class="aceite">
+    <h2><span>04</span>Aceite</h2>
+    <p>Declaro estar de acordo com o escopo e as condições comerciais descritas nesta proposta.</p>
+    <div class="assin"><div><b>${esc(d.p.cliente)}</b>${d.p.contato?esc(d.p.contato)+' · ':''}Contratante</div><div><b>&nbsp;</b>Contratada</div></div>
+    <div class="local">Local e data: ______________________________, ____ / ____ / ________</div>
+  </section>
+
+  <div class="rodape"><span>Proposta comercial nº ${num}</span><span>Emitida em ${esc(dataBR(d.p.data))}</span></div>
+</div>
+<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
   const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para gerar o PDF.');w.document.open();w.document.write(html);w.document.close();
 }
 function enviarWhatsApp(id){
@@ -882,7 +1051,7 @@ function atualizarTudo(){
   atualizarPreviewMassa();
 
   histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>À vista</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
-    const st=p.status||'Pendente';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>12 × ${fmt(p.mensal)}<br><small>ou à vista com 10%</small></td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="enviarWhatsApp('${p.id}')">💬 WhatsApp</button> <button class="secondary" onclick="enviarEmail('${p.id}')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+    const st=p.status||'Pendente';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);return `12 × ${fmt(c.parcela)}<br><small>ou à vista com 10%</small>${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="enviarWhatsApp('${p.id}')">💬 WhatsApp</button> <button class="secondary" onclick="enviarEmail('${p.id}')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
   }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
 
   dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
