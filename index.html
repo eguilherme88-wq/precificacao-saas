@@ -128,6 +128,18 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
 @media(max-width:800px){.header-actions{gap:6px}.hdr-btn{width:44px;height:44px}}
 @media(max-width:420px){.hdr-btn{width:40px;height:40px;font-size:17px}.nova-btn{width:40px!important;height:40px!important}header{gap:6px!important}}
 @media(prefers-reduced-motion:reduce){.card-mod{transition:none}}
+.sair-btn{display:flex;align-items:center;gap:6px;height:42px;padding:0 14px;border-radius:10px;background:#ffffff1f;color:#fff;border:1px solid #ffffff40;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap}
+.sair-btn:hover{background:#d92d20;border-color:#d92d20}
+.sidebar{display:flex;flex-direction:column;overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+.sidebar-direitos{margin-top:auto;padding:16px 6px 0;border-top:1px solid #ffffff1f;font-size:11.5px;line-height:1.5;color:#b8c6e3;text-align:left}
+.sidebar-direitos b{color:#fff;font-weight:700}
+.sidebar-direitos small{display:block;margin-top:6px;font-size:10.5px;color:#8a9bc0;line-height:1.45}
+.sidebar .nav{margin-bottom:18px}
+.login-direitos{margin-top:18px;padding-top:14px;border-top:1px solid var(--line,#e4e7ec);text-align:center;font-size:12px;color:#667085}
+html[data-theme="dark"] .login-logo{filter:brightness(0) invert(1)}
+html[data-theme="dark"] .login-direitos{color:#98a2b3;border-color:#2a3a5c}
+@media(max-width:800px){.sair-btn{width:44px;height:44px;padding:0;justify-content:center;font-size:18px}.sair-btn span{display:none}}
+@media(max-width:420px){.sair-btn{width:40px;height:40px;font-size:16px}}
 .aviso-edicao{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#fffaeb;border:1px solid #fedf89;color:#93370d;font-weight:600;font-size:14px}
 .aviso-edicao[hidden]{display:none}
 html[data-theme="dark"] .aviso-edicao{background:#3a2a0c;border-color:#7a5a12;color:#fec84b}
@@ -180,6 +192,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
     <button class="primary" style="width:100%;margin-top:20px" onclick="entrarSistema()">🔐 Entrar</button>
     <div id="loginErro" class="login-error"></div>
     <p class="muted" style="margin-top:14px">Primeiro acesso: usuário <b>admin</b> e senha <b>Admin@123</b>.</p>
+    <div class="login-direitos">© <span class="ano-atual">2026</span> Partner Precificação SaaS. Todos os direitos reservados.</div>
   </div>
 </div>
 <div class="menu-backdrop" onclick="fecharMenu()"></div>
@@ -196,8 +209,11 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
     <button class="tab" onclick="abrir('proposta',this)">📄 Montar Proposta</button>
     <button class="tab" onclick="abrir('historico',this)">📋 Histórico de Propostas</button>
     <button class="tab" onclick="abrir('seguranca',this)">🔐 Segurança</button>
-    <button class="tab" onclick="sairSistema()">🚪 Sair</button>
   </nav>
+  <footer class="sidebar-direitos">
+    <div>© <span class="ano-atual">2026</span> <b>Partner Precificação SaaS</b>.<br>Todos os direitos reservados.</div>
+    <small>Proibida a reprodução, cópia ou distribuição, total ou parcial, sem autorização prévia.</small>
+  </footer>
 </aside>
 
 <header>
@@ -207,6 +223,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
     <button class="hdr-btn" id="btnTema" onclick="alternarTema()" aria-label="Ativar tema escuro" title="Tema escuro">🌙</button>
     <button class="hdr-btn" id="btnTelaCheia" onclick="alternarTelaCheia()" aria-label="Entrar em tela cheia" title="Tela cheia">⛶</button>
     <button class="secondary nova-btn" onclick="abrir('proposta',document.querySelector('.tab[onclick*=proposta]'))" aria-label="Nova proposta">＋<span> Nova proposta</span></button>
+    <button class="sair-btn" onclick="sairSistema()" aria-label="Sair do sistema" title="Sair do sistema">⏻<span> Sair</span></button>
   </div>
 </header>
 
@@ -398,6 +415,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
 </div>
 
 <script>
+document.querySelectorAll('.ano-atual').forEach(e=>e.textContent=new Date().getFullYear());
 const KEY_P='precificacao_modulos_v2';
 const KEY_AUTH='precificacao_auth_v1';
 const HASH_INICIAL='e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7';
@@ -1050,7 +1068,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
     <div class="local">Local e data: ______________________________, ____ / ____ / ________</div>
   </section>
 
-  <div class="rodape"><span>Proposta comercial nº ${num}</span><span>Emitida em ${esc(dataBR(d.p.data))}</span></div>
+  <div class="rodape"><span>Proposta comercial nº ${num} · Emitida em ${esc(dataBR(d.p.data))}</span><span>© ${new Date().getFullYear()} Partner Precificação SaaS. Todos os direitos reservados.</span></div>
 </div>
 ${modo==='imprimir'?'<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>':''}</body></html>`;
   return html;
