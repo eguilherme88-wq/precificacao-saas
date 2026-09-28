@@ -683,11 +683,17 @@ function calcularCondicoes(mensal,qtd){
   const desconto=arred(subtotal*PCT_DESCONTO_AVISTA);
   return {mensal,bruto,qtd,temVolume,descontoVolume,subtotal,parcela,desconto,total:arred(subtotal-desconto)};
 }
-// Propostas antigas (antes desta regra) não têm os campos novos: usa os valores gravados
-function condicoesProposta(p){
-  if(p.parcela!=null)return {mensal:p.mensal,bruto:p.bruto,qtd:(p.modulosIds||[]).length,temVolume:!!p.descontoVolume,descontoVolume:p.descontoVolume||0,subtotal:p.subtotal,parcela:p.parcela,desconto:p.desconto,total:p.total};
-  return {mensal:p.mensal,bruto:p.bruto,qtd:(p.modulosIds||[]).length,temVolume:false,descontoVolume:0,subtotal:p.bruto,parcela:p.mensal,desconto:p.desconto,total:p.total};
+// As condições são sempre calculadas pela quantidade de módulos da proposta:
+// a partir de 10 módulos o desconto de 10% entra automaticamente, inclusive em propostas antigas.
+function condicoesProposta(p){return calcularCondicoes(p.mensal,(p.modulosIds||[]).length);}
+function recalcularProposta(p){
+  const c=condicoesProposta(p);
+  const campos={bruto:c.bruto,descontoVolume:c.descontoVolume,subtotal:c.subtotal,parcela:c.parcela,desconto:c.desconto,total:c.total};
+  const mudou=Object.keys(campos).some(k=>p[k]!==campos[k]);
+  Object.assign(p,campos);return mudou;
 }
+// Atualiza as propostas já salvas (ex.: geradas antes da regra de desconto por volume)
+(function(){try{let alterou=false;db.propostas.forEach(p=>{if(recalcularProposta(p))alterou=true;});if(alterou)localStorage.setItem(KEY_P,JSON.stringify(db));}catch(e){console.error(e)}})();
 function calcularTotalProposta(){
   const checkboxes=document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked');
   let mensal=0;
