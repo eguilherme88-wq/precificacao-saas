@@ -128,6 +128,24 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
 @media(max-width:800px){.header-actions{gap:6px}.hdr-btn{width:44px;height:44px}}
 @media(max-width:420px){.hdr-btn{width:40px;height:40px;font-size:17px}.nova-btn{width:40px!important;height:40px!important}header{gap:6px!important}}
 @media(prefers-reduced-motion:reduce){.card-mod{transition:none}}
+.aviso-edicao{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#fffaeb;border:1px solid #fedf89;color:#93370d;font-weight:600;font-size:14px}
+.aviso-edicao[hidden]{display:none}
+html[data-theme="dark"] .aviso-edicao{background:#3a2a0c;border-color:#7a5a12;color:#fec84b}
+.envio-overlay{position:fixed;inset:0;z-index:200;background:#0b1220a6;display:flex;align-items:center;justify-content:center;padding:18px}
+.envio-overlay[hidden]{display:none}
+.envio-box{position:relative;width:100%;max-width:520px;background:var(--card,#fff);color:var(--dark);border-radius:16px;padding:24px;box-shadow:0 20px 60px #0006;max-height:calc(100% - 20px);overflow:auto}
+.envio-box h3{margin:0 34px 4px 0;font-size:19px}
+.envio-fechar{position:absolute;top:14px;right:14px;background:transparent;border:0;font-size:18px;cursor:pointer;color:var(--muted,#667085);padding:6px 10px;border-radius:8px}
+.envio-fechar:hover{background:#0000000d}
+.envio-status{margin:16px 0;padding:14px;border-radius:10px;background:#f8fafc;border:1px solid var(--line);font-size:14px;display:flex;align-items:center;gap:12px}
+.envio-status.ok{background:#ecfdf3;border-color:#abefc6;color:#067647}
+.envio-status.erro{background:#fef3f2;border-color:#fecdca;color:#b42318}
+.envio-acoes{display:grid;gap:10px}
+.envio-acoes button{width:100%;justify-content:center}
+.envio-dica{display:block;margin-top:14px;line-height:1.5}
+.spinner{width:20px;height:20px;border-radius:50%;border:3px solid #155eef33;border-top-color:#155eef;animation:gira .8s linear infinite;flex:none}
+@keyframes gira{to{transform:rotate(360deg)}}
+html[data-theme="dark"] .envio-box{background:#16213a}html[data-theme="dark"] .envio-status{background:#12203a}html[data-theme="dark"] .envio-status.ok{background:#0f3a28;border-color:#1f6b4a;color:#6ce9a6}html[data-theme="dark"] .envio-status.erro{background:#3b1512;border-color:#7a2a24;color:#fda29b}
 .aviso-volume{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600;background:#eff8ff;color:#175cd3;border:1px solid #d1e9ff}
 .aviso-volume.ativo{background:#ecfdf3;color:#027a48;border-color:#abefc6}.aviso-volume:empty{display:none}
 html[data-theme="dark"] .aviso-volume{background:#172f5c;color:#9dc2ff;border-color:#2a4a85}html[data-theme="dark"] .aviso-volume.ativo{background:#0f3a28;color:#6ce9a6;border-color:#1f6b4a}
@@ -317,7 +335,8 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
 
   <section id="proposta" class="section">
     <div class="card form-card">
-      <h2 class="title">Montar Proposta Comercial para Cliente</h2>
+      <h2 class="title" id="tituloProposta">Montar Proposta Comercial para Cliente</h2>
+      <div class="aviso-edicao" id="avisoEdicao" hidden><span id="avisoEdicaoTxt"></span><button class="secondary" onclick="cancelarEdicaoProposta()">✕ Cancelar edição</button></div>
       <div class="row row3">
         <div><label>Cliente / Empresa</label><select id="pCliente" onchange="preencherClienteProposta()"></select></div>
         <div><label>Responsável / Contato</label><input id="pContato" placeholder="Preenchido pelo cadastro" readonly></div>
@@ -350,7 +369,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
       </div>
 
       <div class="actions">
-        <button class="primary" onclick="salvarProposta()">💾 Gerar e Salvar Proposta</button>
+        <button class="primary" id="btnSalvarProposta" onclick="salvarProposta()">💾 Gerar e Salvar Proposta</button>
         <button class="secondary" onclick="limparPropostaForm()">↺ Limpar</button>
       </div>
     </div>
@@ -800,6 +819,18 @@ function salvarProposta(){
     condicao:pCondicao.value.trim()
   };
 
+  if(editandoPropostaId){
+    const existente=db.propostas.find(x=>x.id===editandoPropostaId);
+    if(existente){
+      const {id,status,...novosDados}=proposta;
+      Object.assign(existente,novosDados,{editadaEm:new Date().toISOString()});
+      persist();
+      alert(`Proposta nº ${existente.id.slice(0,8).toUpperCase()} atualizada com sucesso!`);
+      limparPropostaForm();
+      abrir('historico',document.querySelector(`.tab[onclick*="'historico'"]`));
+      return;
+    }
+  }
   db.propostas.unshift(proposta);
   persist();
   alert('Proposta comercial gerada com sucesso!');
@@ -807,7 +838,43 @@ function salvarProposta(){
   abrir('historico');
 }
 
+let editandoPropostaId=null;
+function atualizarModoEdicaoProposta(){
+  const p=editandoPropostaId&&db.propostas.find(x=>x.id===editandoPropostaId);
+  avisoEdicao.hidden=!p;
+  if(p)avisoEdicaoTxt.textContent=`✏️ Editando a proposta nº ${p.id.slice(0,8).toUpperCase()} de ${p.cliente}. O número e o status da proposta são mantidos.`;
+  btnSalvarProposta.textContent=p?'💾 Salvar alterações da proposta':'💾 Gerar e Salvar Proposta';
+  tituloProposta.textContent=p?'Editar Proposta Comercial':'Montar Proposta Comercial para Cliente';
+}
+function editarProposta(id){
+  const p=db.propostas.find(x=>x.id===id);if(!p)return;
+  editandoPropostaId=id;
+  abrir('proposta',document.querySelector(`.tab[onclick*="'proposta'"]`));
+  pCliente.value=db.clientes.some(c=>c.id===p.clienteId)?p.clienteId:'';
+  preencherClienteProposta();
+  pContato.value=p.contato||pContato.value;
+  pData.value=p.data||new Date().toISOString().slice(0,10);
+  pSistema.value=db.sistemas.some(s=>s.id===p.sistemaId)?p.sistemaId:'';
+  renderizarCheckModulos();
+  const ids=new Set(p.modulosIds||[]);
+  const caixas=[...document.querySelectorAll('#listaCheckModulos input[type="checkbox"]')];
+  caixas.forEach(cb=>{cb.checked=ids.has(cb.value);});
+  const disponiveis=new Set(caixas.map(cb=>cb.value));
+  const faltando=[...ids].filter(x=>!disponiveis.has(x));
+  const opcoes=[...pMeioPagamento.options].map(o=>o.value);
+  if(opcoes.includes(p.meioPagamento)){pMeioPagamento.value=p.meioPagamento;alternarOutroPagamento();}
+  else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
+  pCondicao.value=p.condicao||'';
+  pEmailAceite.value=p.emailAceite||pEmailAceite.value;
+  pWhatsAceite.value=p.whatsAceite||pWhatsAceite.value;
+  calcularTotalProposta();
+  atualizarModoEdicaoProposta();
+  if(!pCliente.value)alert('O cliente desta proposta não está mais cadastrado. Selecione um cliente antes de salvar.');
+  if(faltando.length)alert(`${faltando.length} módulo(s) desta proposta não estão mais disponíveis (foram excluídos ou mudaram de sistema) e ficaram fora da edição. Confira a lista antes de salvar.`);
+}
+function cancelarEdicaoProposta(){limparPropostaForm();abrir('historico',document.querySelector(`.tab[onclick*="'historico'"]`));}
 function limparPropostaForm(){
+  editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
   pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';
   pData.value=new Date().toISOString().slice(0,10);
@@ -816,7 +883,7 @@ function limparPropostaForm(){
 }
 
 function excluirProposta(id){
-  if(confirm('Excluir esta proposta?')){db.propostas=db.propostas.filter(x=>x.id!==id);persist()}
+  if(confirm('Excluir esta proposta?')){db.propostas=db.propostas.filter(x=>x.id!==id);if(editandoPropostaId===id)limparPropostaForm();persist()}
 }
 function alterarStatusProposta(id,status){const p=db.propostas.find(x=>x.id===id);if(!p)return;p.status=status;p.dataStatus=new Date().toISOString();persist();}
 
@@ -841,11 +908,11 @@ function corpoEmailHtml(id){
   const d=dadosProposta(id);if(!d)return '';
   const c=condicoesProposta(d.p);
   const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(m.anual)}/mês</td></tr>`).join('');
-  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(d.p.data)}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
 function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
-function gerarPdfProposta(id){
-  const d=dadosProposta(id);if(!d)return alert('Proposta não encontrada.');
+function htmlProposta(id,modo='imprimir'){
+  const d=dadosProposta(id);if(!d)return '';
   const c=condicoesProposta(d.p);
   const num=d.p.id.slice(0,8).toUpperCase();
   const logo=document.querySelector('.login-logo')?.src||'';
@@ -872,7 +939,8 @@ body{margin:0;font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;co
 .ident .num{font-size:13pt;font-weight:800;color:#102a56;letter-spacing:.02em}
 .capa{padding:22px 0 18px}
 .eyebrow{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#155eef;font-weight:700}
-.capa h1{margin:6px 0 8px;font-size:21pt;line-height:1.2;color:#102a56;letter-spacing:-.01em}
+.cliente-sub{font-size:14pt;font-weight:600;color:#344054;margin:0 0 10px;line-height:1.3}
+.capa h1{margin:6px 0 4px;font-size:21pt;line-height:1.2;color:#102a56;letter-spacing:-.01em}
 .capa p{margin:0;color:#475467;max-width:150mm}
 .partes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px}
 .parte{border:1px solid #e4e7ec;border-radius:8px;padding:12px 14px;background:#f8fafc}
@@ -920,11 +988,12 @@ table{width:100%;border-collapse:collapse}
 .assin b{display:block;color:#1d2939;font-size:10pt}
 .local{margin-top:22px;font-size:9.5pt;color:#475467}
 .rodape{margin-top:26px;padding-top:10px;border-top:1px solid #e4e7ec;display:flex;justify-content:space-between;font-size:8pt;color:#98a2b3}
+body.arquivo{background:#fff}body.arquivo .pagina{margin:0;padding:0;box-shadow:none;width:186mm;max-width:none}
 @media print{body{background:#fff}.barra{display:none}.pagina{margin:0;padding:0;box-shadow:none;max-width:none}}
 @media(max-width:700px){.pagina{padding:18px;margin:0}.partes,.invest,.assin{grid-template-columns:1fr}}
 `;
-  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposta ${num} - ${esc(d.p.cliente)}</title><style>${css}</style></head><body>
-<div class="barra"><span>Proposta comercial nº ${num}</span><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposta ${num} - ${esc(d.p.cliente)}</title><style>${css}</style>${modo==='arquivo'?`<script src="${URL_HTML2PDF}"><\/script>`:''}</head><body class="${modo==='arquivo'?'arquivo':''}">
+${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</span><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>`:''}
 <div class="pagina">
   <header class="topo">
     <div>${logo?`<img src="${logo}" alt="Logo">`:'<div class="marca-txt">Proposta</div>'}</div>
@@ -933,7 +1002,8 @@ table{width:100%;border-collapse:collapse}
 
   <section class="capa">
     <div class="eyebrow">Licenciamento de software · 12 meses</div>
-    <h1>${esc(d.sistema?.nome||'Módulos de software')} para ${esc(d.p.cliente)}</h1>
+    <h1>${esc(d.sistema?.nome||'Módulos de software')}</h1>
+    <div class="cliente-sub">${esc(d.p.cliente)}</div>
     <p>Apresentamos o escopo dos módulos propostos, com a descrição das funcionalidades de cada um, o investimento e as condições comerciais para o licenciamento anual.</p>
   </section>
 
@@ -982,9 +1052,103 @@ table{width:100%;border-collapse:collapse}
 
   <div class="rodape"><span>Proposta comercial nº ${num}</span><span>Emitida em ${esc(dataBR(d.p.data))}</span></div>
 </div>
-<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
+${modo==='imprimir'?'<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>':''}</body></html>`;
+  return html;
+}
+function gerarPdfProposta(id){
+  const html=htmlProposta(id,'imprimir');if(!html)return alert('Proposta não encontrada.');
   const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para gerar o PDF.');w.document.open();w.document.write(html);w.document.close();
 }
+
+// ===== PDF como arquivo (para anexar no WhatsApp / e-mail) =====
+const URL_HTML2PDF='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+function nomeArquivoProposta(p){
+  const cli=String(p.cliente||'cliente').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40);
+  return `Proposta_${p.id.slice(0,8).toUpperCase()}_${cli}.pdf`;
+}
+async function gerarArquivoPdf(id){
+  const d=dadosProposta(id);if(!d)throw new Error('Proposta não encontrada');
+  const ifr=document.createElement('iframe');
+  ifr.setAttribute('aria-hidden','true');
+  ifr.style.cssText='position:fixed;left:-12000px;top:0;width:820px;height:1200px;border:0;visibility:hidden';
+  document.body.appendChild(ifr);
+  try{
+    await new Promise((res,rej)=>{ifr.onload=res;ifr.onerror=rej;ifr.srcdoc=htmlProposta(id,'arquivo');});
+    const w=ifr.contentWindow;
+    for(let i=0;!w.html2pdf;i++){if(i>80)throw new Error('Biblioteca de PDF não carregou (verifique a internet).');await new Promise(r=>setTimeout(r,100));}
+    if(w.document.fonts)await w.document.fonts.ready;
+    // As opções são recriadas dentro do iframe: a biblioteca não aceita arrays criados em outra janela
+    const opcoes=w.JSON.parse(JSON.stringify({
+      margin:[12,12,14,12],
+      filename:nomeArquivoProposta(d.p),
+      image:{type:'jpeg',quality:0.96},
+      html2canvas:{scale:2,useCORS:true,logging:false,backgroundColor:'#ffffff',windowWidth:820},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['css','legacy'],avoid:['tr','.parte','.invest','.opcao','.selo','.aceite','h2','.cond li']}
+    }));
+    const blob=await w.html2pdf().set(opcoes).from(w.document.querySelector('.pagina')).outputPdf('blob');
+    const buf=await blob.arrayBuffer();
+    return new File([buf],nomeArquivoProposta(d.p),{type:'application/pdf'});
+  }finally{ifr.remove();}
+}
+function baixarArquivo(file){
+  const url=URL.createObjectURL(file);const a=document.createElement('a');a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+function mensagemEnvio(id,comAnexo){
+  const d=dadosProposta(id);if(!d)return '';const c=condicoesProposta(d.p);
+  const num=d.p.id.slice(0,8).toUpperCase();
+  return `Olá${d.p.contato?', '+d.p.contato:''}! ${comAnexo?'Segue em anexo (PDF)':'Segue'} a proposta comercial nº ${num} do ${d.sistema?.nome||'sistema'} para ${d.p.cliente}, com ${d.modulos.length} módulo(s).\n\nOpção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)}${c.temVolume?'\n(já com 10% de desconto por volume)':''}\n\n✅ Para aceitar a proposta:\n${linkAceite(d.p)}`;
+}
+
+// ===== Janela de envio (WhatsApp / e-mail) =====
+let envioAtual=null;
+async function abrirEnvio(id,canal){
+  const d=dadosProposta(id);if(!d)return;
+  const tel=telefoneComPais(d.cliente?.telefone),email=(d.cliente?.email||'').trim();
+  if(canal==='whatsapp'&&!tel)return alert('Cadastre o telefone do cliente antes de enviar pelo WhatsApp.');
+  if(canal==='email'&&!email)return alert('Cadastre o e-mail do cliente antes do envio.');
+  envioAtual={id,canal,file:null,estado:'gerando'};
+  envioTitulo.textContent=canal==='whatsapp'?'💬 Enviar proposta pelo WhatsApp':'✉️ Enviar proposta por e-mail';
+  envioSub.textContent=`${d.p.cliente} · ${canal==='whatsapp'?(d.cliente?.telefone||''):email} · Proposta nº ${d.p.id.slice(0,8).toUpperCase()}`;
+  envioOverlay.hidden=false;renderEnvio();
+  try{const f=await gerarArquivoPdf(id);if(!envioAtual||envioAtual.id!==id)return;envioAtual.file=f;envioAtual.estado='pronto';}
+  catch(e){console.error(e);if(!envioAtual||envioAtual.id!==id)return;envioAtual.estado='erro';}
+  renderEnvio();
+}
+function fecharEnvio(){envioOverlay.hidden=true;envioAtual=null;}
+function podeCompartilharArquivo(f){try{return !!(f&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(e){return false;}}
+function renderEnvio(){
+  if(!envioAtual)return;
+  const {canal,file,estado}=envioAtual,nomeCanal=canal==='whatsapp'?'WhatsApp':'e-mail';
+  const share=estado==='pronto'&&podeCompartilharArquivo(file);
+  if(estado==='gerando'){envioStatus.className='envio-status';envioStatus.innerHTML='<span class="spinner"></span> Gerando o PDF da proposta...';}
+  else if(estado==='pronto'){envioStatus.className='envio-status ok';envioStatus.innerHTML=`📄 <span><b>${esc(file.name)}</b><br>PDF pronto (${Math.max(1,Math.round(file.size/1024))} KB)</span>`;}
+  else{envioStatus.className='envio-status erro';envioStatus.innerHTML='⚠️ <span>Não foi possível gerar o PDF automaticamente. Verifique a conexão com a internet e tente de novo, ou use o botão <b>📄 PDF</b> do histórico para salvar o arquivo manualmente.</span>';}
+  let b='';
+  if(share)b+=`<button class="primary" onclick="compartilharPdf()">📎 Enviar com o PDF anexado</button>`;
+  if(estado==='pronto')b+=`<button class="${share?'secondary':'primary'}" onclick="baixarEAbrir()">⬇️ Baixar PDF e abrir o ${nomeCanal}</button><button class="secondary" onclick="baixarArquivo(envioAtual.file)">⬇️ Só baixar o PDF</button>`;
+  if(estado==='erro')b+=`<button class="primary" onclick="abrirEnvio(envioAtual.id,envioAtual.canal)">↻ Tentar gerar o PDF novamente</button>`;
+  b+=`<button class="secondary" onclick="enviarSoMensagem()">${canal==='whatsapp'?'💬':'✉️'} Enviar só a mensagem (sem anexo)</button>`;
+  envioAcoes.innerHTML=b;
+  envioDica.innerHTML=estado!=='pronto'?'':share
+    ?`Em <b>Enviar com o PDF anexado</b>, escolha ${canal==='whatsapp'?'o <b>WhatsApp</b> e depois o contato do cliente':'o seu aplicativo de <b>e-mail</b>'} na janela de compartilhamento. O PDF vai anexado junto com a mensagem e o link de aceite.`
+    :`Este navegador não permite anexar arquivos automaticamente. Em <b>Baixar PDF e abrir o ${nomeCanal}</b>, o PDF é salvo na pasta Downloads e ${canal==='whatsapp'?'a conversa com o cliente':'o e-mail para o cliente'} abre com a mensagem pronta. Depois é só anexar o arquivo${canal==='whatsapp'?' (no WhatsApp Web, clique no 📎 ou arraste o PDF para a conversa)':''}.`;
+}
+async function compartilharPdf(){
+  if(!envioAtual?.file)return;const {id,canal,file}=envioAtual;const d=dadosProposta(id);
+  const dados={files:[file],title:`Proposta comercial - ${d.p.cliente}`,text:mensagemEnvio(id,true)};
+  try{await navigator.share(dados);fecharEnvio();}
+  catch(e){if(e.name!=='AbortError'){console.error(e);alert(`Não foi possível compartilhar o arquivo por aqui. Use "Baixar PDF e abrir o ${canal==='whatsapp'?'WhatsApp':'e-mail'}".`);}}
+}
+function baixarEAbrir(){
+  if(!envioAtual?.file)return;const {id,canal,file}=envioAtual;const d=dadosProposta(id);
+  baixarArquivo(file);
+  const msg=mensagemEnvio(id,true);
+  if(canal==='whatsapp')window.open(`https://wa.me/${telefoneComPais(d.cliente?.telefone)}?text=${encodeURIComponent(msg)}`,'_blank');
+  else location.href=`mailto:${encodeURIComponent((d.cliente?.email||'').trim())}?subject=${encodeURIComponent('Proposta Comercial - '+d.p.cliente)}&body=${encodeURIComponent(msg+'\n\n📎 Anexo: '+file.name)}`;
+}
+function enviarSoMensagem(){if(!envioAtual)return;const {id,canal}=envioAtual;fecharEnvio();canal==='whatsapp'?enviarWhatsApp(id):enviarEmail(id);}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!envioOverlay.hidden)fecharEnvio();});
 function enviarWhatsApp(id){
   const d=dadosProposta(id);if(!d)return;let telefone=(d.cliente?.telefone||'').replace(/\D/g,'');
   if(!telefone)return alert('Cadastre o telefone do cliente antes de enviar pelo WhatsApp.');if(telefone.length<=11)telefone='55'+telefone;
@@ -1057,10 +1221,10 @@ function atualizarTudo(){
   atualizarPreviewMassa();
 
   histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>À vista</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
-    const st=p.status||'Pendente';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);return `12 × ${fmt(c.parcela)}<br><small>ou à vista com 10%</small>${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="enviarWhatsApp('${p.id}')">💬 WhatsApp</button> <button class="secondary" onclick="enviarEmail('${p.id}')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);return `12 × ${fmt(c.parcela)}<br><small>ou à vista com 10%</small>${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
   }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
 
-  dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
+  dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
 }
 
 function atualizarSelects(){const sis=mSistema.value,cat=mCat.value,scat=sCat.value;sCat.innerHTML='<option value="">Nenhuma</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(db.categorias.some(c=>c.id===scat))sCat.value=scat;mSistema.innerHTML='<option value="">Selecione...</option><option value="independente">🔹 Módulo independente (sem sistema)</option>'+db.sistemas.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');mCat.innerHTML='<option value="">Selecione...</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(db.sistemas.some(s=>s.id===sis))mSistema.value=sis;if(db.categorias.some(c=>c.id===cat))mCat.value=cat;}
@@ -1072,5 +1236,15 @@ atualizarTudo();
 secEmailAdmin.value=auth.emailAdmin||'';
 if(sessionStorage.getItem('precificacao_logado')==='1')loginOverlay.style.display='none';else setTimeout(()=>loginSenha.focus(),50);
 </script>
+<div id="envioOverlay" class="envio-overlay" hidden onclick="if(event.target===this)fecharEnvio()">
+  <div class="envio-box" role="dialog" aria-modal="true" aria-labelledby="envioTitulo">
+    <button class="envio-fechar" onclick="fecharEnvio()" aria-label="Fechar">✕</button>
+    <h3 id="envioTitulo"></h3>
+    <div class="muted" id="envioSub"></div>
+    <div id="envioStatus" class="envio-status"></div>
+    <div class="envio-acoes" id="envioAcoes"></div>
+    <small class="muted envio-dica" id="envioDica"></small>
+  </div>
+</div>
 </body>
 </html>
