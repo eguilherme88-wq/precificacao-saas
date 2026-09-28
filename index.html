@@ -128,6 +128,25 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
 @media(max-width:800px){.header-actions{gap:6px}.hdr-btn{width:44px;height:44px}}
 @media(max-width:420px){.hdr-btn{width:40px;height:40px;font-size:17px}.nova-btn{width:40px!important;height:40px!important}header{gap:6px!important}}
 @media(prefers-reduced-motion:reduce){.card-mod{transition:none}}
+/* ===== Filtros, contadores e alteração em massa ===== */
+.filtro-rodape{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:#eef4ff;color:#155eef;font-size:13px;font-weight:700}
+.chip.neutro{background:#f2f4f7;color:var(--dark)}.chip.verde{background:#ecfdf3;color:#027a48}
+.filtro-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.filtro-acoes label{margin:0;white-space:nowrap}.filtro-acoes select{width:auto}
+.chk-mod{width:18px!important;height:18px;min-height:0!important;padding:0;margin:0;cursor:pointer;accent-color:var(--primary)}
+tr.mod-sel td{background:#f5f8ff}
+.paginacao{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.paginacao .pag-btns{display:flex;gap:6px;align-items:center}
+.paginacao button[disabled]{opacity:.45;cursor:default}
+.massa-preview{margin-top:14px;padding:12px 14px;border-radius:10px;background:#f8fafc;border:1px dashed var(--line);font-size:14px;line-height:1.5}
+.massa-preview b{color:var(--primary)}
+.massa-botao{display:flex;align-items:flex-end}.massa-botao button{width:100%}
+.btn-link{background:none;color:var(--primary);padding:0;font-weight:700;text-decoration:underline;min-height:0!important}
+.qtd-mod{white-space:nowrap}
+html[data-theme="dark"] .chip{background:#172f5c;color:#9dc2ff}html[data-theme="dark"] .chip.neutro{background:#22304f;color:var(--dark)}html[data-theme="dark"] .chip.verde{background:#0f3a28;color:#6ce9a6}
+html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"] .massa-preview{background:#12203a}
+@media(max-width:800px){.filtro-acoes{width:100%}.filtro-acoes select{flex:1}.filtro-rodape{align-items:stretch}table.tabela-responsiva td[data-label="Selecionar"]{text-align:right}table.tabela-responsiva tr.mod-sel{background:#f5f8ff;border-color:var(--primary)}html[data-theme="dark"] table.tabela-responsiva tr.mod-sel{background:#1a2a4d}}
 </style>
 <script>(function(){try{var t=localStorage.getItem("precificacao_tema");if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 </head>
@@ -190,10 +209,31 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
     <div class="card form-card">
       <h2 class="title">🔎 Buscar Sistema ou Módulo</h2>
       <div class="row">
-        <div><label>Pesquisar</label><input id="buscaModSis" placeholder="Digite o nome do sistema, módulo, categoria ou descrição..." oninput="atualizarTudo()"></div>
-        <div><label>Filtrar por Categoria</label><select id="buscaModSisCat" onchange="atualizarTudo()"><option value="">Todas as categorias</option></select></div>
+        <div><label>Pesquisar</label><input id="buscaModSis" placeholder="Digite o nome do sistema, módulo, categoria ou descrição..." oninput="filtrarMod()"></div>
+        <div><label>Filtrar por Categoria</label><select id="buscaModSisCat" onchange="filtrarMod()"><option value="">Todas as categorias</option></select></div>
       </div>
-      <small class="muted">Ao pesquisar o nome de um sistema, os módulos vinculados a ele aparecem automaticamente na lista de módulos abaixo.</small>
+      <div class="row4" style="margin-top:12px">
+        <div><label>Filtrar por Sistema</label><select id="buscaModSistema" onchange="filtrarMod()"><option value="">Todos os sistemas</option></select></div>
+        <div><label>Valor mensal mínimo (R$)</label><input id="buscaValMin" type="number" min="0" step="0.01" placeholder="Sem mínimo" oninput="filtrarMod()"></div>
+        <div><label>Valor mensal máximo (R$)</label><input id="buscaValMax" type="number" min="0" step="0.01" placeholder="Sem máximo" oninput="filtrarMod()"></div>
+        <div><label>Ordenar módulos por</label><select id="buscaOrdem" onchange="filtrarMod()">
+          <option value="cadastro">Ordem de cadastro</option>
+          <option value="nome">Nome (A → Z)</option>
+          <option value="nomeDesc">Nome (Z → A)</option>
+          <option value="valorAsc">Menor valor</option>
+          <option value="valorDesc">Maior valor</option>
+          <option value="sistema">Sistema</option>
+        </select></div>
+      </div>
+      <div class="filtro-rodape">
+        <div class="chips" id="contadorFiltro"></div>
+        <div class="filtro-acoes">
+          <label for="buscaQtd">Módulos por página</label>
+          <select id="buscaQtd" onchange="filtrarMod()"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option><option value="todos">Todos</option></select>
+          <button class="secondary" onclick="limparFiltrosMod()">↺ Limpar filtros</button>
+        </div>
+      </div>
+      <small class="muted" style="display:block;margin-top:10px">Ao pesquisar o nome de um sistema, os módulos vinculados a ele aparecem automaticamente na lista de módulos abaixo.</small>
     </div>
     <div class="card form-card">
       <h2 class="title" id="tituloSistema">Cadastrar Sistema</h2>
@@ -220,7 +260,31 @@ html[data-theme="dark"] .desc-item{background:#1a2644}
         <button class="danger" id="btnCancelarMod" style="display:none" onclick="limparModuloForm()">Cancelar edição</button>
       </div>
     </div>
-    <div class="card"><div id="modTabela"></div></div>
+    <div class="card form-card" id="cardMassa">
+      <h2 class="title">💲 Alterar valores em massa</h2>
+      <div class="row4">
+        <div><label>Aplicar em</label><select id="massaAlvo" onchange="atualizarPreviewMassa()">
+          <option value="selecionados">Módulos selecionados na tabela</option>
+          <option value="filtrados">Todos os módulos filtrados</option>
+        </select></div>
+        <div><label>Tipo de alteração</label><select id="massaTipo" onchange="atualizarPreviewMassa()">
+          <option value="fixo">Definir valor mensal (R$)</option>
+          <option value="aumentoPct">Aumentar em %</option>
+          <option value="reducaoPct">Reduzir em %</option>
+          <option value="somar">Somar valor (R$)</option>
+          <option value="subtrair">Subtrair valor (R$)</option>
+        </select></div>
+        <div><label id="massaValorLabel">Novo valor mensal (R$)</label><input id="massaValor" type="number" min="0" step="0.01" placeholder="0,00" oninput="atualizarPreviewMassa()"></div>
+        <div class="massa-botao"><button class="primary" onclick="aplicarValorEmMassa()">✔ Aplicar alteração</button></div>
+      </div>
+      <div class="massa-preview" id="massaPreview"></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="secondary" onclick="selecionarFiltrados()">☑ Selecionar todos os filtrados</button>
+        <button class="secondary" onclick="limparSelecaoMod()">☐ Limpar seleção</button>
+        <button class="danger" id="btnDesfazerMassa" style="display:none" onclick="desfazerMassa()">↶ Desfazer última alteração em massa</button>
+      </div>
+    </div>
+    <div class="card"><div id="modTabela"></div><div id="modPaginacao"></div></div>
   </section>
 
   <section id="categorias" class="section">
@@ -315,6 +379,7 @@ const HASH_INICIAL='e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3
 let db=JSON.parse(localStorage.getItem(KEY_P)||'null')||{sistemas:[],categorias:[],clientes:[],modulos:[],propostas:[]};
 db.sistemas=db.sistemas||[];db.categorias=db.categorias||[];db.clientes=db.clientes||[];db.modulos=db.modulos||[];db.propostas=db.propostas||[];
 let editandoModId=null,editandoSisId=null,editandoCatId=null,editandoCliId=null;
+let selecionadosMod=new Set(),paginaMod=1,ultimaAlteracaoMassa=null;
 let auth=JSON.parse(localStorage.getItem(KEY_AUTH)||'null')||{usuario:'admin',senhaHash:HASH_INICIAL,emailAdmin:''};
 
 async function hashSenha(valor){const dados=new TextEncoder().encode(valor);const hash=await crypto.subtle.digest('SHA-256',dados);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');}
@@ -373,7 +438,109 @@ function filtrarModulosSistemas(){
     });
   }
 
+  // Filtro por sistema e faixa de valor mensal
+  const sisFiltro=buscaModSistema?.value||'';
+  const vMin=parseFloat(buscaValMin?.value),vMax=parseFloat(buscaValMax?.value);
+  if(sisFiltro)sistemasFiltrados=sistemasFiltrados.filter(s=>sisFiltro!=='independente'&&s.id===sisFiltro);
+  modulosFiltrados=modulosFiltrados.filter(m=>{
+    if(sisFiltro&&(sisFiltro==='independente'?!!m.sistemaId:m.sistemaId!==sisFiltro))return false;
+    const v=Number(m.anual)||0;
+    if(!isNaN(vMin)&&v<vMin)return false;
+    if(!isNaN(vMax)&&v>vMax)return false;
+    return true;
+  });
+
   return {sistemasFiltrados,modulosFiltrados};
+}
+function filtrarMod(){paginaMod=1;atualizarTudo();}
+function limparFiltrosMod(){buscaModSis.value='';buscaModSisCat.value='';buscaModSistema.value='';buscaValMin.value='';buscaValMax.value='';buscaOrdem.value='cadastro';filtrarMod();}
+function verModulosDoSistema(id){limparFiltrosMod();buscaModSistema.value=id;filtrarMod();modTabela.scrollIntoView({behavior:'smooth',block:'start'});}
+function ordenarModulos(lista){
+  const nomeSis=m=>m.sistemaId?(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||''):'~';
+  const cmp=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'});
+  const l=[...lista];
+  switch(buscaOrdem?.value){
+    case 'nome':l.sort((a,b)=>cmp(a.nome,b.nome));break;
+    case 'nomeDesc':l.sort((a,b)=>cmp(b.nome,a.nome));break;
+    case 'valorAsc':l.sort((a,b)=>(Number(a.anual)||0)-(Number(b.anual)||0));break;
+    case 'valorDesc':l.sort((a,b)=>(Number(b.anual)||0)-(Number(a.anual)||0));break;
+    case 'sistema':l.sort((a,b)=>cmp(nomeSis(a),nomeSis(b))||cmp(a.nome,b.nome));break;
+  }
+  return l;
+}
+function irPaginaMod(n){paginaMod=n;atualizarTudo();modTabela.scrollIntoView({behavior:'smooth',block:'start'});}
+
+// ===== Seleção de módulos =====
+function alternarSelecaoMod(id,marcado){marcado?selecionadosMod.add(id):selecionadosMod.delete(id);atualizarTudo();}
+function alternarSelecaoVisiveis(marcado){document.querySelectorAll('#modTabela .chk-mod[data-id]').forEach(c=>marcado?selecionadosMod.add(c.dataset.id):selecionadosMod.delete(c.dataset.id));atualizarTudo();}
+function selecionarFiltrados(){filtrarModulosSistemas().modulosFiltrados.forEach(m=>selecionadosMod.add(m.id));massaAlvo.value='selecionados';atualizarTudo();}
+function limparSelecaoMod(){selecionadosMod.clear();atualizarTudo();}
+
+// ===== Alteração de valores em massa =====
+function arred(v){return Math.round((Number(v)+Number.EPSILON)*100)/100}
+function calcularNovoValor(atual,tipo,v){
+  atual=Number(atual)||0;
+  switch(tipo){
+    case 'fixo':return arred(v);
+    case 'aumentoPct':return arred(atual*(1+v/100));
+    case 'reducaoPct':return arred(atual*(1-v/100));
+    case 'somar':return arred(atual+v);
+    case 'subtrair':return arred(atual-v);
+  }
+  return atual;
+}
+function modulosAlvoMassa(){
+  if(massaAlvo.value==='filtrados')return filtrarModulosSistemas().modulosFiltrados;
+  return db.modulos.filter(m=>selecionadosMod.has(m.id));
+}
+function atualizarPreviewMassa(){
+  if(typeof massaPreview==='undefined')return;
+  const tipo=massaTipo.value;
+  massaValorLabel.textContent=tipo==='fixo'?'Novo valor mensal (R$)':(tipo.endsWith('Pct')?'Percentual (%)':'Valor (R$)');
+  massaValor.placeholder=tipo.endsWith('Pct')?'Ex.: 10':'0,00';
+  const nFiltrados=filtrarModulosSistemas().modulosFiltrados.length;
+  massaAlvo.options[0].textContent=`Módulos selecionados na tabela (${selecionadosMod.size})`;
+  massaAlvo.options[1].textContent=`Todos os módulos filtrados (${nFiltrados})`;
+  const alvo=modulosAlvoMassa();
+  if(!alvo.length){massaPreview.innerHTML=massaAlvo.value==='selecionados'?'Nenhum módulo selecionado. Marque os módulos na tabela abaixo ou escolha <b>Todos os módulos filtrados</b>.':'Nenhum módulo corresponde aos filtros atuais.';return;}
+  const somaAtual=alvo.reduce((a,m)=>a+(Number(m.anual)||0),0);
+  const v=parseFloat(massaValor.value);
+  if(isNaN(v)){massaPreview.innerHTML=`<b>${alvo.length}</b> módulo(s) serão alterados. Soma mensal atual: <b>${fmt(somaAtual)}</b>. Informe o valor para ver o resultado.`;return;}
+  const novos=alvo.map(m=>calcularNovoValor(m.anual,tipo,v));
+  const somaNova=novos.reduce((a,x)=>a+x,0);
+  const invalidos=novos.filter(x=>x<=0).length;
+  const dif=somaNova-somaAtual;
+  massaPreview.innerHTML=`<b>${alvo.length}</b> módulo(s) serão alterados. Soma mensal: ${fmt(somaAtual)} → <b>${fmt(somaNova)}</b> (${dif>=0?'+':''}${fmt(dif)} por mês · ${dif>=0?'+':''}${fmt(dif*12)} em 12 meses).`+(invalidos?`<br><span style="color:#b42318">⚠ ${invalidos} módulo(s) ficariam com valor zero ou negativo. Ajuste o valor antes de aplicar.</span>`:'');
+}
+function congelarValoresPropostas(){
+  // Guarda nas propostas antigas o valor que cada módulo tinha, para o PDF não mudar depois de um reajuste
+  db.propostas.forEach(p=>{if(!p.valores){p.valores={};(p.modulosIds||[]).forEach(id=>{const m=db.modulos.find(x=>x.id===id);if(m)p.valores[id]=Number(m.anual)||0;});}});
+}
+function aplicarValorEmMassa(){
+  const tipo=massaTipo.value,v=parseFloat(massaValor.value);
+  const alvo=modulosAlvoMassa();
+  if(!alvo.length)return alert(massaAlvo.value==='selecionados'?'Selecione ao menos um módulo na tabela.':'Nenhum módulo corresponde aos filtros atuais.');
+  if(isNaN(v)||v<0)return alert('Informe um valor válido.');
+  if(tipo==='fixo'&&v<=0)return alert('O novo valor mensal deve ser maior que zero.');
+  if(tipo==='reducaoPct'&&v>=100)return alert('A redução deve ser menor que 100%.');
+  const novos=alvo.map(m=>({m,novo:calcularNovoValor(m.anual,tipo,v)}));
+  if(novos.some(x=>x.novo<=0))return alert('A alteração deixaria módulos com valor zero ou negativo. Ajuste o valor.');
+  const descr={fixo:`definir o valor mensal em ${fmt(v)}`,aumentoPct:`aumentar ${v}%`,reducaoPct:`reduzir ${v}%`,somar:`somar ${fmt(v)}`,subtrair:`subtrair ${fmt(v)}`}[tipo];
+  if(!confirm(`Confirma ${descr} em ${alvo.length} módulo(s)?\n\nPropostas já geradas mantêm os valores originais.`))return;
+  congelarValoresPropostas();
+  ultimaAlteracaoMassa=novos.map(x=>({id:x.m.id,anual:x.m.anual}));
+  novos.forEach(x=>{x.m.anual=x.novo;});
+  massaValor.value='';
+  persist();
+  btnDesfazerMassa.style.display='inline-block';
+  alert(`${alvo.length} módulo(s) atualizados com sucesso.`);
+}
+function desfazerMassa(){
+  if(!ultimaAlteracaoMassa)return;
+  if(!confirm(`Desfazer a última alteração em massa (${ultimaAlteracaoMassa.length} módulo(s))?`))return;
+  ultimaAlteracaoMassa.forEach(o=>{const m=db.modulos.find(x=>x.id===o.id);if(m)m.anual=o.anual;});
+  ultimaAlteracaoMassa=null;btnDesfazerMassa.style.display='none';
+  persist();
 }
 function persist(){localStorage.setItem(KEY_P,JSON.stringify(db));atualizarTudo()}
 function abrir(id,el){
@@ -433,6 +600,7 @@ function salvarModulo(){
   const dados={nome,sistemaId:mSistema.value==='independente'?'':mSistema.value,categoriaId:mCat.value,anual,desc:mDesc.value.trim()};
   
   if(editandoModId){
+    congelarValoresPropostas();
     const idx=db.modulos.findIndex(x=>x.id===editandoModId);
     if(idx>=0)db.modulos[idx]={...db.modulos[idx],...dados};
     alert('Módulo atualizado com sucesso.');
@@ -462,7 +630,7 @@ function limparModuloForm(){
 }
 
 function excluirModulo(id){
-  if(confirm('Deseja excluir este módulo?')){db.modulos=db.modulos.filter(x=>x.id!==id);persist()}
+  if(confirm('Deseja excluir este módulo?')){db.modulos=db.modulos.filter(x=>x.id!==id);selecionadosMod.delete(id);persist()}
 }
 
 function cardModuloProposta(m,marcado){
@@ -590,6 +758,7 @@ function salvarProposta(){
     data:pData.value||new Date().toISOString().slice(0,10),
     sistemaId:pSistema.value,
     modulosIds,
+    valores:Object.fromEntries(modulosIds.map(id=>[id,Number(db.modulos.find(m=>m.id===id)?.anual)||0])),
     mensal,bruto,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
@@ -616,7 +785,7 @@ function alterarStatusProposta(id,status){const p=db.propostas.find(x=>x.id===id
 
 function dadosProposta(id){
   const p=db.propostas.find(x=>x.id===id);if(!p)return null;
-  return {p,cliente:db.clientes.find(x=>x.id===p.clienteId),sistema:db.sistemas.find(x=>x.id===p.sistemaId),modulos:p.modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(Boolean)};
+  return {p,cliente:db.clientes.find(x=>x.id===p.clienteId),sistema:db.sistemas.find(x=>x.id===p.sistemaId),modulos:p.modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return m?{...m,anual:(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual}:null;}).filter(Boolean)};
 }
 function textoProposta(id){
   const d=dadosProposta(id);if(!d)return '';
@@ -684,14 +853,33 @@ function atualizarTudo(){
     const optsCatBusca='<option value="">Todas as categorias</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
     if(buscaModSisCat&&buscaModSisCat.innerHTML!==optsCatBusca){const atualCat=buscaModSisCat.value;buscaModSisCat.innerHTML=optsCatBusca;if(db.categorias.some(c=>c.id===atualCat))buscaModSisCat.value=atualCat;}
   }
+  {
+    const optsSis='<option value="">Todos os sistemas</option><option value="independente">🔹 Somente módulos independentes</option>'+db.sistemas.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
+    if(buscaModSistema&&buscaModSistema.innerHTML!==optsSis){const atual=buscaModSistema.value;buscaModSistema.innerHTML=optsSis;if(atual==='independente'||db.sistemas.some(s=>s.id===atual))buscaModSistema.value=atual;}
+  }
+  selecionadosMod=new Set([...selecionadosMod].filter(id=>db.modulos.some(m=>m.id===id)));
   const {sistemasFiltrados,modulosFiltrados}=filtrarModulosSistemas();
-  const buscaAtiva=(buscaModSis?.value?.trim()||buscaModSisCat?.value||'');
+  const buscaAtiva=(buscaModSis?.value?.trim()||buscaModSisCat?.value||buscaModSistema?.value||buscaValMin?.value||buscaValMax?.value||'');
+  const somaFiltrados=modulosFiltrados.reduce((a,m)=>a+(Number(m.anual)||0),0);
+  contadorFiltro.innerHTML=`<span class="chip">📦 ${modulosFiltrados.length} de ${db.modulos.length} módulo(s)</span><span class="chip neutro">🧩 ${sistemasFiltrados.length} de ${db.sistemas.length} sistema(s)</span><span class="chip verde">💰 Soma mensal: ${fmt(somaFiltrados)}</span>`+(selecionadosMod.size?`<span class="chip">☑ ${selecionadosMod.size} selecionado(s)</span>`:'');
+  const qtdModSis=id=>db.modulos.filter(m=>m.sistemaId===id);
 
-  sisTabela.innerHTML=sistemasFiltrados.length?`<table><thead><tr><th>Sistema</th><th>Categoria</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${sistemasFiltrados.map(s=>`<tr><td><b>${esc(s.nome)}</b></td><td>${esc(db.categorias.find(c=>c.id===s.categoriaId)?.nome||'-')}</td><td>${esc(s.desc)}</td><td><button class="secondary" onclick="editarSistema('${s.id}')">✏️ Editar</button> <button class="danger" onclick="excluirSistema('${s.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${db.sistemas.length&&buscaAtiva?'Nenhum sistema encontrado para esta busca.':'Nenhum sistema cadastrado.'}</div>`;
+  sisTabela.innerHTML=sistemasFiltrados.length?`<table><thead><tr><th>Sistema</th><th>Categoria</th><th>Descrição</th><th>Módulos</th><th>Soma mensal</th><th>Ações</th></tr></thead><tbody>${sistemasFiltrados.map(s=>{const ms=qtdModSis(s.id);return `<tr><td><b>${esc(s.nome)}</b></td><td>${esc(db.categorias.find(c=>c.id===s.categoriaId)?.nome||'-')}</td><td>${esc(s.desc)}</td><td class="qtd-mod">${ms.length?`<button class="btn-link" onclick="verModulosDoSistema('${s.id}')" title="Ver módulos deste sistema">${ms.length} módulo(s)</button>`:'<span class="muted">0</span>'}</td><td class="nowrap">${fmt(ms.reduce((a,m)=>a+(Number(m.anual)||0),0))}</td><td><button class="secondary" onclick="editarSistema('${s.id}')">✏️ Editar</button> <button class="danger" onclick="excluirSistema('${s.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.sistemas.length&&buscaAtiva?'Nenhum sistema encontrado para esta busca.':'Nenhum sistema cadastrado.'}</div>`;
   catTabela.innerHTML=db.categorias.length?`<table><thead><tr><th>Categoria</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${db.categorias.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.desc)}</td><td><button class="secondary" onclick="editarCategoria('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCategoria('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma categoria cadastrada.</div>';
   cliTabela.innerHTML=db.clientes.length?`<table><thead><tr><th>Cliente / Empresa</th><th>CPF / CNPJ</th><th>Contato</th><th>Telefone</th><th>E-mail</th><th>Cidade</th><th>Ações</th></tr></thead><tbody>${db.clientes.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.documento||'-')}</td><td>${esc(c.contato||'-')}</td><td>${esc(c.telefone||'-')}</td><td>${esc(c.email||'-')}</td><td>${esc(c.cidade||'-')}</td><td class="nowrap"><button class="secondary" onclick="editarCliente('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCliente('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum cliente cadastrado.</div>';
 
-  modTabela.innerHTML=modulosFiltrados.length?`<table><thead><tr><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${modulosFiltrados.map(m=>`<tr><td><b>${esc(m.nome)}</b><br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td>${fmt(m.anual)}</td><td>${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
+  {
+    const lista=ordenarModulos(modulosFiltrados);
+    const porPag=buscaQtd.value==='todos'?Infinity:Number(buscaQtd.value)||25;
+    const totalPag=porPag===Infinity?1:Math.max(1,Math.ceil(lista.length/porPag));
+    if(paginaMod>totalPag)paginaMod=totalPag;if(paginaMod<1)paginaMod=1;
+    const ini=porPag===Infinity?0:(paginaMod-1)*porPag;
+    const visiveis=porPag===Infinity?lista:lista.slice(ini,ini+porPag);
+    const todosVisSel=visiveis.length&&visiveis.every(m=>selecionadosMod.has(m.id));
+    modTabela.innerHTML=visiveis.length?`<table><thead><tr><th style="width:36px"><input type="checkbox" class="chk-mod" title="Selecionar todos desta página" ${todosVisSel?'checked':''} onchange="alternarSelecaoVisiveis(this.checked)"></th><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${visiveis.map(m=>{const sel=selecionadosMod.has(m.id);return `<tr class="${sel?'mod-sel':''}"><td data-label="Selecionar"><input type="checkbox" class="chk-mod" data-id="${m.id}" ${sel?'checked':''} onchange="alternarSelecaoMod('${m.id}',this.checked)" aria-label="Selecionar ${esc(m.nome)}"></td><td><b>${esc(m.nome)}</b><br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td class="nowrap">${fmt(m.anual)}</td><td class="nowrap">${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
+    modPaginacao.innerHTML=lista.length?`<div class="paginacao"><span class="muted">Mostrando ${ini+1}–${ini+visiveis.length} de ${lista.length} módulo(s)</span>${totalPag>1?`<div class="pag-btns"><button class="secondary" ${paginaMod<=1?'disabled':''} onclick="irPaginaMod(${paginaMod-1})">‹ Anterior</button><span class="muted">Página ${paginaMod} de ${totalPag}</span><button class="secondary" ${paginaMod>=totalPag?'disabled':''} onclick="irPaginaMod(${paginaMod+1})">Próxima ›</button></div>`:''}</div>`:'';
+  }
+  atualizarPreviewMassa();
 
   histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>À vista</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
     const st=p.status||'Pendente';return `<tr><td>${p.data}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>12 × ${fmt(p.mensal)}<br><small>ou à vista com 10%</small></td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="enviarWhatsApp('${p.id}')">💬 WhatsApp</button> <button class="secondary" onclick="enviarEmail('${p.id}')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
