@@ -88,7 +88,48 @@ header .header-text{min-width:0}
 }
 @media(max-width:360px){.grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.sidebar,.menu-backdrop{transition:none}}
+
+/* ===== Botões do cabeçalho (tema e tela cheia) ===== */
+.header-actions{display:flex;align-items:center;gap:8px;flex:none}
+.hdr-btn{display:flex;align-items:center;justify-content:center;width:42px;height:42px;padding:0;background:#ffffff1f;color:#fff;font-size:19px;border-radius:10px;line-height:1}
+.hdr-btn:hover{background:#ffffff33}
+.hdr-btn:focus-visible,.tab:focus-visible,button:focus-visible{outline:2px solid #9dbbff;outline-offset:2px}
+.hdr-btn[hidden]{display:none}
+/* ===== Descrição dos módulos selecionados na proposta ===== */
+.mod-desc{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;line-height:1.5;color:var(--dark);white-space:pre-line}
+.mod-desc.vazia{color:var(--muted);font-style:italic}
+.card-mod{transition:border-color .15s,box-shadow .15s}
+.card-mod.selecionado{border-color:var(--primary)!important;box-shadow:0 0 0 1px var(--primary) inset}
+#descSelecionados{margin-top:18px}
+#descSelecionados h3{margin:0 0 10px;font-size:16px}
+.desc-item{padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:10px;background:var(--card);margin-bottom:8px}
+.desc-item b{display:block;margin-bottom:4px}
+.desc-item p{margin:0;font-size:13px;line-height:1.55;white-space:pre-line}
+/* ===== Tema escuro ===== */
+html[data-theme="dark"]{color-scheme:dark;--bg:#0e1626;--card:#16213a;--dark:#e4e9f2;--muted:#9aa6bb;--line:#2a3857;--primary:#3b7bff;--primary2:#2a66e6;--sidebar:#0a1730}
+html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#0f1a30;border-color:#34446a;color:var(--dark)}
+html[data-theme="dark"] input[readonly]{background:#131f38;color:var(--muted)}
+html[data-theme="dark"] table{background:var(--card)}
+html[data-theme="dark"] th{background:#1c2946;color:var(--dark)}
+html[data-theme="dark"] .secondary{background:#1d2d52;color:#a9c4ff}
+html[data-theme="dark"] header .secondary{background:#ffffff1f;color:#fff}
+html[data-theme="dark"] .danger{background:#4a1f22;color:#fda29b}
+html[data-theme="dark"] .ok{background:#0f3a28;color:#6ce9a6}
+html[data-theme="dark"] .warn{background:#43300b;color:#fec84b}
+html[data-theme="dark"] .info{background:#172f5c;color:#9dc2ff}
+html[data-theme="dark"] .card[style*="background:#f8fafc"],html[data-theme="dark"] .card[style*="background:#fff"]{background:#1a2644!important}
+html[data-theme="dark"] .kpi-icon{background:#22304f!important}
+html[data-theme="dark"] .login-box{background:var(--card);color:var(--dark)}
+html[data-theme="dark"] .login-error{color:#fda29b}
+html[data-theme="dark"] header{background:linear-gradient(135deg,#0a1730,#1b3f8f)}
+html[data-theme="dark"] .login-overlay{background:linear-gradient(135deg,#0a1730,#1b3f8f)}
+html[data-theme="dark"] .desc-item{background:#1a2644}
+@media(max-width:800px){html[data-theme="dark"] table.tabela-responsiva tr{background:var(--card)}}
+@media(max-width:800px){.header-actions{gap:6px}.hdr-btn{width:44px;height:44px}}
+@media(max-width:420px){.hdr-btn{width:40px;height:40px;font-size:17px}.nova-btn{width:40px!important;height:40px!important}header{gap:6px!important}}
+@media(prefers-reduced-motion:reduce){.card-mod{transition:none}}
 </style>
+<script>(function(){try{var t=localStorage.getItem("precificacao_tema");if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 </head>
 <body>
 <div id="loginOverlay" class="login-overlay">
@@ -122,7 +163,11 @@ header .header-text{min-width:0}
 <header>
   <button class="menu-btn" aria-label="Abrir menu" onclick="alternarMenu()">☰</button>
   <div class="header-text"><h1>Sistema de Precificação de Softwares</h1><p>Gerenciamento de custos por módulo, implantação e mensalidades (SaaS)</p></div>
-  <button class="secondary nova-btn" onclick="abrir('proposta',document.querySelector('.tab[onclick*=proposta]'))" aria-label="Nova proposta">＋<span> Nova proposta</span></button>
+  <div class="header-actions">
+    <button class="hdr-btn" id="btnTema" onclick="alternarTema()" aria-label="Ativar tema escuro" title="Tema escuro">🌙</button>
+    <button class="hdr-btn" id="btnTelaCheia" onclick="alternarTelaCheia()" aria-label="Entrar em tela cheia" title="Tela cheia">⛶</button>
+    <button class="secondary nova-btn" onclick="abrir('proposta',document.querySelector('.tab[onclick*=proposta]'))" aria-label="Nova proposta">＋<span> Nova proposta</span></button>
+  </div>
 </header>
 
 <div class="container">
@@ -215,6 +260,7 @@ header .header-text{min-width:0}
       <div style="margin-top:22px"><label>Sistema (opcional — módulos independentes ficam sempre disponíveis)</label><select id="pSistema" onchange="renderizarCheckModulos();calcularTotalProposta()"></select></div>
       <h3 style="margin-top:18px; font-size:16px;">Módulos disponíveis neste sistema:</h3>
       <div id="listaCheckModulos" style="margin-top:10px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px;"></div>
+      <div id="descSelecionados" style="display:none"></div>
 
       <div class="row" style="margin-top:20px;">
         <div><label>Meio de Pagamento</label><select id="pMeioPagamento" onchange="alternarOutroPagamento()"><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Boleto">Boleto</option><option value="Outro">Outro</option></select><input id="pMeioOutro" style="display:none;margin-top:8px" placeholder="Informe o outro meio de pagamento"></div>
@@ -421,7 +467,7 @@ function excluirModulo(id){
 
 function cardModuloProposta(m,marcado){
   return `
-    <div class="card" style="padding:12px; background:#f8fafc; border:1px solid var(--line);">
+    <div class="card card-mod${marcado?' selecionado':''}" style="padding:12px; background:#f8fafc; border:1px solid var(--line);">
       <label style="display:flex; align-items:start; gap:10px; cursor:pointer;">
         <input type="checkbox" value="${m.id}" ${marcado?'checked':''} onchange="calcularTotalProposta()" style="width:auto; margin-top:3px;">
         <div>
@@ -462,7 +508,60 @@ function calcularTotalProposta(){
   const desconto=bruto*.10;
   resMensalProposta.textContent=fmt(mensal);resBruto.textContent=fmt(bruto);resDesconto.textContent=fmt(desconto);resTotal.textContent=fmt(bruto-desconto);
   resParcelas.textContent=`12 parcelas de ${fmt(mensal)}`;
+  atualizarDescricoesSelecionados();
 }
+
+// Mostra a descrição de cada módulo marcado na proposta
+function atualizarDescricoesSelecionados(){
+  const painel=document.getElementById('descSelecionados');if(!painel)return;
+  document.querySelectorAll('#listaCheckModulos input[type="checkbox"]').forEach(cb=>cb.closest('.card-mod')?.classList.toggle('selecionado',cb.checked));
+  const sel=[...document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked')].map(cb=>db.modulos.find(x=>x.id===cb.value)).filter(Boolean);
+  if(!sel.length){painel.style.display='none';painel.innerHTML='';return;}
+  painel.style.display='block';
+  painel.innerHTML=`<h3>📝 Descrição dos módulos selecionados (${sel.length})</h3>`+sel.map(m=>{
+    const cat=db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria';
+    const desc=(m.desc||'').trim();
+    return `<div class="desc-item"><b>${esc(m.nome)} <span class="badge info">${esc(cat)}</span></b><p${desc?'':' class="muted"'}>${desc?esc(desc):'Este módulo ainda não possui descrição cadastrada. Edite-o em Módulos e Sistemas para incluir.'}</p></div>`;
+  }).join('');
+}
+
+// ===== Tema claro / escuro =====
+function aplicarTema(t){
+  document.documentElement.dataset.theme=t;
+  const escuro=t==='dark';
+  btnTema.textContent=escuro?'☀️':'🌙';
+  btnTema.title=escuro?'Tema claro':'Tema escuro';
+  btnTema.setAttribute('aria-label',escuro?'Ativar tema claro':'Ativar tema escuro');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',escuro?'#0a1730':'#102a56');
+}
+function alternarTema(){
+  const novo=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  try{localStorage.setItem('precificacao_tema',novo)}catch(e){}
+  aplicarTema(novo);
+}
+
+// ===== Tela cheia =====
+function elementoTelaCheia(){return document.fullscreenElement||document.webkitFullscreenElement||null}
+function alternarTelaCheia(){
+  const el=document.documentElement;
+  if(!elementoTelaCheia()){
+    const req=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(req){const r=req.call(el);if(r&&r.catch)r.catch(()=>alert('O navegador não permitiu abrir em tela cheia.'));}
+  }else{
+    const sair=document.exitFullscreen||document.webkitExitFullscreen;
+    if(sair)sair.call(document);
+  }
+}
+function atualizarBotaoTelaCheia(){
+  const ativo=!!elementoTelaCheia();
+  btnTelaCheia.textContent=ativo?'🗗':'⛶';
+  btnTelaCheia.title=ativo?'Sair da tela cheia':'Tela cheia';
+  btnTelaCheia.setAttribute('aria-label',ativo?'Sair da tela cheia':'Entrar em tela cheia');
+}
+document.addEventListener('fullscreenchange',atualizarBotaoTelaCheia);
+document.addEventListener('webkitfullscreenchange',atualizarBotaoTelaCheia);
+if(!(document.fullscreenEnabled||document.webkitFullscreenEnabled))btnTelaCheia.hidden=true;
+aplicarTema(document.documentElement.dataset.theme==='dark'?'dark':'light');
 
 function salvarProposta(){
   const clienteCad=db.clientes.find(x=>x.id===pCliente.value);
