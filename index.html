@@ -140,6 +140,9 @@ html[data-theme="dark"] .login-logo{filter:brightness(0) invert(1)}
 html[data-theme="dark"] .login-direitos{color:#98a2b3;border-color:#2a3a5c}
 @media(max-width:800px){.sair-btn{width:44px;height:44px;padding:0;justify-content:center;font-size:18px}.sair-btn span{display:none}}
 @media(max-width:420px){.sair-btn{width:40px;height:40px;font-size:16px}}
+.mods-topo{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+.sel-todos{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}
+html[data-theme="dark"] .sel-todos{background:#12203a}
 .hosp-config{display:grid;gap:12px;margin-top:16px;padding:14px;border:1px dashed var(--line);border-radius:10px}
 .chk-linha{display:flex;gap:10px;align-items:flex-start;margin:0;font-weight:400;cursor:pointer}
 .chk-linha input{width:18px!important;height:18px;min-height:0!important;margin-top:2px;flex:none;accent-color:var(--primary)}
@@ -376,8 +379,19 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
       </div>
       
       <div style="margin-top:22px"><label>Sistema (opcional — módulos independentes ficam sempre disponíveis)</label><select id="pSistema" onchange="renderizarCheckModulos();calcularTotalProposta()"></select></div>
-      <h3 style="margin-top:18px; font-size:16px;">Módulos disponíveis neste sistema:</h3>
+      <div class="mods-topo">
+        <h3 style="margin:0; font-size:16px;">Módulos disponíveis neste sistema:</h3>
+        <label class="chk-linha sel-todos"><input type="checkbox" id="pSelTodos" onchange="selecionarTodosModulosProposta(this.checked)"> <span><b>Selecionar todos os módulos</b> <small class="muted" id="pSelTodosInfo"></small></span></label>
+      </div>
       <div id="listaCheckModulos" style="margin-top:10px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px;"></div>
+      <div id="boxTaxaHosp" class="hosp-resumo" style="display:none;margin-top:14px" data-hid="">
+        <b>🖥️ Taxa de hospedagem e manutenção desta proposta</b>
+        <div class="row" style="margin-top:10px">
+          <div><label for="pTaxaHosp">Valor da taxa de hospedagem (R$/mês)</label><input id="pTaxaHosp" type="number" min="0" step="0.01" placeholder="0,00" oninput="calcularTotalProposta()"></div>
+          <div><label for="pHospAdicional">Adicional por sistema extra (R$/mês)</label><input id="pHospAdicional" type="number" min="0" step="0.01" placeholder="0,00" oninput="calcularTotalProposta()"></div>
+        </div>
+        <small class="muted">Os valores vêm do cadastro do módulo e podem ser alterados. A alteração vale só para esta proposta.</small>
+      </div>
       <div id="descSelecionados" style="display:none"></div>
 
       <div class="row" style="margin-top:20px;">
@@ -702,16 +716,49 @@ function alternarCamposHosp(){
 
 // ===== Taxa de hospedagem: sistemas em operação =====
 function normTxt(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
-function calcularHospedagem(modulos){
+function calcularHospedagem(modulos,opts={}){
   const hosp=modulos.find(m=>m&&m.taxaHospedagem);
   const vazio={aplica:false,valor:0,adicionais:0,sistemas:[],incluidos:0,valorAdicional:0,qtdUnificados:0};
   if(!hosp)return vazio;
   const outros=modulos.filter(m=>m&&!m.taxaHospedagem);
   const unificados=outros.filter(m=>!m.separado),separados=outros.filter(m=>m.separado);
   const sistemas=[...(unificados.length?[`Sistema unificado (${unificados.length} módulo${unificados.length===1?'':'s'})`]:[]),...separados.map(m=>m.nome)];
-  const incluidos=Number(hosp.hospIncluidos??1),valorAdicional=Number(hosp.hospAdicional??80);
+  const incluidos=Number(hosp.hospIncluidos??1),valorAdicional=opts.adicional!=null?Number(opts.adicional):Number(hosp.hospAdicional??80);
+  const taxaBase=opts.taxa!=null?Number(opts.taxa):Number(hosp.anual)||0;
   const adicionais=Math.max(0,sistemas.length-incluidos);
-  return {aplica:true,hospNome:hosp.nome,valor:arred(adicionais*valorAdicional),adicionais,sistemas,incluidos,valorAdicional,qtdUnificados:unificados.length};
+  return {aplica:true,hospId:hosp.id,hospNome:hosp.nome,taxaBase,valor:arred(adicionais*valorAdicional),adicionais,sistemas,incluidos,valorAdicional,qtdUnificados:unificados.length};
+}
+// Cláusula da hospedagem para a proposta (PDF / e-mail)
+function clausulaHospedagem(d){
+  const hm=d.modulos.find(m=>m.taxaHospedagem);if(!hm)return null;
+  const h=d.p.hospedagem||{};
+  const taxa=h.taxaBase??hm.anual,inc=Number(h.incluidos??hm.hospIncluidos??1),adic=Number(h.valorAdicional??hm.hospAdicional??80);
+  return {
+    texto:`A taxa base de hospedagem e manutenção da estrutura é de ${fmt(taxa)}/mês, dando direito a ${inc} sistema${inc===1?'':'s'} integrado${inc===1?'':'s'} ativo${inc===1?'':'s'}. Caso haja necessidade de ativar novos módulos ou sistemas independentes adicionais solicitados pela contratante, será acrescido o valor fixo de ${fmt(adic)}/mês por cada novo sistema que entrar em operação.`,
+    detalhe:d.p.hospedagem?`Nesta proposta: ${textoHospedagem(d.p.hospedagem)}${d.p.hospedagem.adicionais?` Adicional total: ${fmt(d.p.hospedagem.valor)}/mês.`:''}`:''
+  };
+}
+function valoresHospForm(){
+  const t=parseFloat(pTaxaHosp.value),a=parseFloat(pHospAdicional.value);
+  return {taxa:isNaN(t)?undefined:t,adicional:isNaN(a)?undefined:a};
+}
+function somaMensalProposta(mods,opts){return arred(mods.reduce((a,m)=>a+(m.taxaHospedagem&&opts.taxa!=null?Number(opts.taxa):Number(m.anual)||0),0));}
+function sincronizarCamposHosp(mods){
+  const h=mods.find(m=>m.taxaHospedagem);
+  boxTaxaHosp.style.display=h?'block':'none';
+  if(h&&boxTaxaHosp.dataset.hid!==h.id){pTaxaHosp.value=h.anual;pHospAdicional.value=h.hospAdicional??80;boxTaxaHosp.dataset.hid=h.id;}
+  if(!h)boxTaxaHosp.dataset.hid='';
+}
+function selecionarTodosModulosProposta(marcar){
+  document.querySelectorAll('#listaCheckModulos input[type="checkbox"]').forEach(cb=>cb.checked=marcar);
+  calcularTotalProposta();
+}
+function atualizarSelTodos(){
+  const todas=[...document.querySelectorAll('#listaCheckModulos input[type="checkbox"]')],marc=todas.filter(cb=>cb.checked).length;
+  pSelTodos.disabled=!todas.length;
+  pSelTodos.checked=!!todas.length&&marc===todas.length;
+  pSelTodos.indeterminate=marc>0&&marc<todas.length;
+  pSelTodosInfo.textContent=todas.length?`(${marc} de ${todas.length})`:'';
 }
 function textoHospedagem(h){
   return `Sistemas em operação: ${h.sistemas.length} (${h.sistemas.join(', ')}). A taxa base inclui ${h.incluidos} sistema${h.incluidos===1?'':'s'}; ${h.adicionais?`${h.adicionais} sistema${h.adicionais===1?'':'s'} adiciona${h.adicionais===1?'l':'is'} × ${fmt(h.valorAdicional)}/mês.`:'nenhum sistema adicional.'}`;
@@ -790,12 +837,12 @@ function recalcularProposta(p){
 (function(){try{let alterou=false;db.propostas.forEach(p=>{if(recalcularProposta(p))alterou=true;});if(alterou)localStorage.setItem(KEY_P,JSON.stringify(db));}catch(e){console.error(e)}})();
 function calcularTotalProposta(){
   const checkboxes=document.querySelectorAll('#listaCheckModulos input[type="checkbox"]:checked');
-  let mensal=0;
-  checkboxes.forEach(cb=>{
-    const m=db.modulos.find(x=>x.id===cb.value);
-    if(m)mensal+=Number(m.anual)||0;
-  });
-  const hosp=calcularHospedagem([...checkboxes].map(cb=>db.modulos.find(x=>x.id===cb.value)));
+  const modsSel=[...checkboxes].map(cb=>db.modulos.find(x=>x.id===cb.value)).filter(Boolean);
+  sincronizarCamposHosp(modsSel);
+  atualizarSelTodos();
+  const oh=valoresHospForm();
+  let mensal=somaMensalProposta(modsSel,oh);
+  const hosp=calcularHospedagem(modsSel,oh);
   mensal+=hosp.valor;
   linhaHosp.style.display=hosp.aplica?'block':'none';
   resHosp.textContent=hosp.adicionais?`${hosp.adicionais} × ${fmt(hosp.valorAdicional)} = ${fmt(hosp.valor)}/mês`:'sem adicional';
@@ -880,7 +927,12 @@ function salvarProposta(){
   });
   const semDesc=modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(m=>m&&!(m.desc||'').trim());
   if(semDesc.length&&!confirm(`${semDesc.length} módulo(s) sem descrição cadastrada:\n\n• ${semDesc.map(m=>m.nome).join('\n• ')}\n\nA proposta mostra a descrição de cada módulo. Deseja gerar mesmo assim?`))return;
-  const hosp=calcularHospedagem(modulosIds.map(id=>db.modulos.find(m=>m.id===id)));
+  const modsSel=modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(Boolean);
+  const oh=valoresHospForm();
+  if(modsSel.some(m=>m.taxaHospedagem)&&(!(oh.taxa>0)))return alert('Informe o valor da taxa de hospedagem.');
+  if(modsSel.some(m=>m.taxaHospedagem)&&(oh.adicional==null||oh.adicional<0))return alert('Informe o valor adicional por sistema extra (pode ser 0).');
+  mensal=somaMensalProposta(modsSel,oh);
+  const hosp=calcularHospedagem(modsSel,oh);
   const mensalModulos=mensal;mensal=arred(mensal+hosp.valor);
   const cond=calcularCondicoes(mensal,modulosIds.length);
   const {bruto,descontoVolume,subtotal,parcela,desconto,total}=cond;
@@ -896,8 +948,8 @@ function salvarProposta(){
     data:pData.value||new Date().toISOString().slice(0,10),
     sistemaId:pSistema.value,
     modulosIds,
-    valores:Object.fromEntries(modulosIds.map(id=>[id,Number(db.modulos.find(m=>m.id===id)?.anual)||0])),
-    mensalModulos,hospedagem:hosp.aplica?{adicionais:hosp.adicionais,valorAdicional:hosp.valorAdicional,valor:hosp.valor,incluidos:hosp.incluidos,sistemas:hosp.sistemas}:null,
+    valores:Object.fromEntries(modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return [id,m?.taxaHospedagem&&oh.taxa!=null?Number(oh.taxa):Number(m?.anual)||0];})),
+    mensalModulos,hospedagem:hosp.aplica?{taxaBase:hosp.taxaBase,adicionais:hosp.adicionais,valorAdicional:hosp.valorAdicional,valor:hosp.valor,incluidos:hosp.incluidos,sistemas:hosp.sistemas}:null,
     mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
@@ -948,6 +1000,8 @@ function editarProposta(id){
   if(opcoes.includes(p.meioPagamento)){pMeioPagamento.value=p.meioPagamento;alternarOutroPagamento();}
   else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
   pCondicao.value=p.condicao||'';
+  {const hm=db.modulos.find(m=>m.taxaHospedagem&&ids.has(m.id));
+   if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;}}
   pEmailAceite.value=p.emailAceite||pEmailAceite.value;
   pWhatsAceite.value=p.whatsAceite||pWhatsAceite.value;
   calcularTotalProposta();
@@ -957,6 +1011,7 @@ function editarProposta(id){
 }
 function cancelarEdicaoProposta(){limparPropostaForm();abrir('historico',document.querySelector(`.tab[onclick*="'historico'"]`));}
 function limparPropostaForm(){
+  if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';}
   editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
   pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';
@@ -993,7 +1048,7 @@ function corpoEmailHtml(id){
   const c=condicoesProposta(d.p);
   const hE=d.p.hospedagem;
   const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(m.anual)}/mês</td></tr>`).join('');
-  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table>${(()=>{const cl=clausulaHospedagem(d);return cl?`<div style="margin-top:18px;background:#fffaeb;border:1px solid #fedf89;border-left:4px solid #f79009;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.55;color:#344054"><b>Observação · Hospedagem e manutenção:</b> ${esc(cl.texto)}${cl.detalhe?`<br><span style="color:#667085">${esc(cl.detalhe)}</span>`:''}</div>`:''})()}<p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
 function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
 function htmlProposta(id,modo='imprimir'){
@@ -1012,6 +1067,10 @@ function htmlProposta(id,modo='imprimir'){
   const contatoCli=[cli.email,cli.telefone].filter(Boolean).map(esc).join(' · ');
   const css=`
 .itens tr.linha-hosp td{background:#fffaeb!important}
+.obs-hosp{margin-top:14px;padding:12px 14px;border:1px solid #fedf89;border-left:4px solid #f79009;border-radius:8px;background:#fffaeb;break-inside:avoid}
+.obs-hosp .obs-tit{font-size:8pt;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#b54708;margin-bottom:4px}
+.obs-hosp p{margin:0;color:#344054;font-size:9.5pt;line-height:1.55}
+.obs-hosp p.obs-det{margin-top:6px;color:#667085;font-size:9pt}
 @page{size:A4;margin:14mm 14mm 16mm}
 *{box-sizing:border-box}
 html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1130,6 +1189,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
     <li>Desconto por volume de 10% para propostas a partir de ${MIN_MODULOS_DESCONTO} módulos${c.temVolume?' (aplicado nesta proposta)':''}.</li>
     ${d.p.condicao?`<li>Observação: ${esc(d.p.condicao)}</li>`:''}
   </ul>
+  ${(()=>{const cl=clausulaHospedagem(d);return cl?`<div class="obs-hosp"><div class="obs-tit">Observação · Hospedagem e manutenção da estrutura</div><p>${esc(cl.texto)}</p>${cl.detalhe?`<p class="obs-det">${esc(cl.detalhe)}</p>`:''}</div>`:''})()}
 
   <section class="aceite">
     <h2><span>04</span>Aceite</h2>
@@ -1172,7 +1232,7 @@ async function gerarArquivoPdf(id){
       image:{type:'jpeg',quality:0.96},
       html2canvas:{scale:2,useCORS:true,logging:false,backgroundColor:'#ffffff',windowWidth:820},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['css','legacy'],avoid:['tr','.parte','.invest','.opcao','.selo','.aceite','h2','.cond li']}
+      pagebreak:{mode:['css','legacy'],avoid:['tr','.parte','.invest','.opcao','.selo','.aceite','h2','.cond li','.obs-hosp']}
     }));
     const blob=await w.html2pdf().set(opcoes).from(w.document.querySelector('.pagina')).outputPdf('blob');
     const buf=await blob.arrayBuffer();
