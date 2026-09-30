@@ -401,9 +401,10 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
       <div id="listaCheckModulos" style="margin-top:10px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px;"></div>
       <div id="boxTaxaHosp" class="hosp-resumo" style="display:none;margin-top:14px" data-hid="">
         <b>🖥️ Taxa de hospedagem e manutenção desta proposta</b>
-        <div class="row" style="margin-top:10px">
+        <div class="row3" style="margin-top:10px;display:grid;gap:12px">
           <div><label for="pTaxaHosp">Valor da taxa de hospedagem (R$/mês)</label><input id="pTaxaHosp" type="number" min="0" step="0.01" placeholder="0,00" oninput="calcularTotalProposta()"></div>
           <div><label for="pHospAdicional">Adicional por sistema extra (R$/mês)</label><input id="pHospAdicional" type="number" min="0" step="0.01" placeholder="0,00" oninput="calcularTotalProposta()"></div>
+          <div><label for="pHospIncluidos">Sistemas incluídos na taxa base</label><input id="pHospIncluidos" type="number" min="0" step="1" placeholder="1" oninput="calcularTotalProposta()"></div>
         </div>
         <small class="muted">Os valores vêm do cadastro do módulo e podem ser alterados. A alteração vale só para esta proposta.</small>
       </div>
@@ -705,7 +706,8 @@ function salvarModulo(){
     congelarValoresPropostas();
     const idx=db.modulos.findIndex(x=>x.id===editandoModId);
     if(idx>=0)db.modulos[idx]={...db.modulos[idx],...dados};
-    alert('Módulo atualizado com sucesso.');
+    if(taxaHospedagem&&!editandoPropostaId&&typeof boxTaxaHosp!=='undefined')boxTaxaHosp.dataset.hid='';
+    alert(taxaHospedagem?`Módulo atualizado com sucesso.\n\nTaxa base: ${fmt(anual)}/mês\nSistemas incluídos: ${hospIncluidos}\nAdicional por sistema extra: ${fmt(hospAdicional)}/mês`:'Módulo atualizado com sucesso.');
   }else{
     db.modulos.push({id:crypto.randomUUID(),...dados});
     alert('Módulo cadastrado com sucesso.');
@@ -748,7 +750,7 @@ function calcularHospedagem(modulos,opts={}){
   const outros=modulos.filter(m=>m&&!m.taxaHospedagem);
   const unificados=outros.filter(m=>!m.separado),separados=outros.filter(m=>m.separado);
   const sistemas=[...(unificados.length?[`Sistema unificado (${unificados.length} módulo${unificados.length===1?'':'s'})`]:[]),...separados.map(m=>m.nome)];
-  const incluidos=Number(hosp.hospIncluidos??1),valorAdicional=opts.adicional!=null?Number(opts.adicional):Number(hosp.hospAdicional??80);
+  const incluidos=opts.incluidos!=null?Number(opts.incluidos):Number(hosp.hospIncluidos??1),valorAdicional=opts.adicional!=null?Number(opts.adicional):Number(hosp.hospAdicional??80);
   const taxaBase=opts.taxa!=null?Number(opts.taxa):Number(hosp.anual)||0;
   const adicionais=Math.max(0,sistemas.length-incluidos);
   return {aplica:true,hospId:hosp.id,hospNome:hosp.nome,taxaBase,valor:arred(adicionais*valorAdicional),adicionais,sistemas,incluidos,valorAdicional,qtdUnificados:unificados.length};
@@ -764,14 +766,14 @@ function clausulaHospedagem(d){
   };
 }
 function valoresHospForm(){
-  const t=parseFloat(pTaxaHosp.value),a=parseFloat(pHospAdicional.value);
-  return {taxa:isNaN(t)?undefined:t,adicional:isNaN(a)?undefined:a};
+  const t=parseFloat(pTaxaHosp.value),a=parseFloat(pHospAdicional.value),i=parseInt(pHospIncluidos.value,10);
+  return {taxa:isNaN(t)?undefined:t,adicional:isNaN(a)?undefined:a,incluidos:isNaN(i)?undefined:Math.max(0,i)};
 }
 function somaMensalProposta(mods,opts){return arred(mods.reduce((a,m)=>a+(m.taxaHospedagem&&opts.taxa!=null?Number(opts.taxa):Number(m.anual)||0),0));}
 function sincronizarCamposHosp(mods){
   const h=mods.find(m=>m.taxaHospedagem);
   boxTaxaHosp.style.display=h?'block':'none';
-  if(h&&boxTaxaHosp.dataset.hid!==h.id){pTaxaHosp.value=h.anual;pHospAdicional.value=h.hospAdicional??80;boxTaxaHosp.dataset.hid=h.id;}
+  if(h&&boxTaxaHosp.dataset.hid!==h.id){pTaxaHosp.value=h.anual;pHospAdicional.value=h.hospAdicional??80;pHospIncluidos.value=h.hospIncluidos??1;boxTaxaHosp.dataset.hid=h.id;}
   if(!h)boxTaxaHosp.dataset.hid='';
 }
 function selecionarTodosModulosProposta(marcar){
@@ -811,7 +813,7 @@ function cardModuloProposta(m,marcado){
       <label style="display:flex; align-items:start; gap:10px; cursor:pointer;">
         <input type="checkbox" value="${m.id}" ${marcado?'checked':''} onchange="calcularTotalProposta()" style="width:auto; margin-top:3px;">
         <div>
-          <b>${esc(m.nome)}</b> <span class="badge info">${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria')}</span>${m.separado?' <span class="badge warn" title="Conta como sistema adicional na taxa de hospedagem">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok" title="Inclui ${m.hospIncluidos??1} sistema(s); adicional de ${fmt(m.hospAdicional??80)}/mês por sistema extra">Taxa de hospedagem</span>`:''}
+          <b>${esc(m.nome)}</b> <span class="badge info">${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria')}</span>${m.separado?' <span class="badge warn" title="Conta como sistema adicional na taxa de hospedagem">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok" title="Inclui ${m.hospIncluidos??1} sistema(s); adicional de ${fmt(m.hospAdicional??80)}/mês por sistema extra">Taxa de hospedagem · ${m.hospIncluidos??1} incluído(s) · +${fmt(m.hospAdicional??80)}/extra</span>`:''}
           <div class="muted" style="font-size:12px; margin-top:3px;">Licença mensal: ${fmt(m.anual)} | 12 meses: ${fmt(Number(m.anual)*12)}</div>
         </div>
       </label>
@@ -1026,7 +1028,7 @@ function editarProposta(id){
   else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
   pCondicao.value=p.condicao||'';
   {const hm=db.modulos.find(m=>m.taxaHospedagem&&ids.has(m.id));
-   if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;}}
+   if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;pHospIncluidos.value=p.hospedagem?.incluidos??hm.hospIncluidos??1;}}
   pEmailAceite.value=p.emailAceite||pEmailAceite.value;
   pWhatsAceite.value=p.whatsAceite||pWhatsAceite.value;
   calcularTotalProposta();
@@ -1036,7 +1038,7 @@ function editarProposta(id){
 }
 function cancelarEdicaoProposta(){limparPropostaForm();abrir('historico',document.querySelector(`.tab[onclick*="'historico'"]`));}
 function limparPropostaForm(){
-  if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';}
+  if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';pHospIncluidos.value='';}
   editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
   pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';
@@ -1401,7 +1403,7 @@ function atualizarTudo(){
     const ini=porPag===Infinity?0:(paginaMod-1)*porPag;
     const visiveis=porPag===Infinity?lista:lista.slice(ini,ini+porPag);
     const todosVisSel=visiveis.length&&visiveis.every(m=>selecionadosMod.has(m.id));
-    modTabela.innerHTML=visiveis.length?`<table><thead><tr><th style="width:36px"><input type="checkbox" class="chk-mod" title="Selecionar todos desta página" ${todosVisSel?'checked':''} onchange="alternarSelecaoVisiveis(this.checked)"></th><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${visiveis.map(m=>{const sel=selecionadosMod.has(m.id);return `<tr class="${sel?'mod-sel':''}"><td data-label="Selecionar"><input type="checkbox" class="chk-mod" data-id="${m.id}" ${sel?'checked':''} onchange="alternarSelecaoMod('${m.id}',this.checked)" aria-label="Selecionar ${esc(m.nome)}"></td><td><b>${esc(m.nome)}</b>${m.separado?' <span class="badge warn">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok">Taxa de hospedagem · +${fmt(m.hospAdicional??80)}/sistema extra</span>`:''}<br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td class="nowrap">${fmt(m.anual)}</td><td class="nowrap">${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
+    modTabela.innerHTML=visiveis.length?`<table><thead><tr><th style="width:36px"><input type="checkbox" class="chk-mod" title="Selecionar todos desta página" ${todosVisSel?'checked':''} onchange="alternarSelecaoVisiveis(this.checked)"></th><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${visiveis.map(m=>{const sel=selecionadosMod.has(m.id);return `<tr class="${sel?'mod-sel':''}"><td data-label="Selecionar"><input type="checkbox" class="chk-mod" data-id="${m.id}" ${sel?'checked':''} onchange="alternarSelecaoMod('${m.id}',this.checked)" aria-label="Selecionar ${esc(m.nome)}"></td><td><b>${esc(m.nome)}</b>${m.separado?' <span class="badge warn">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok">Taxa de hospedagem · ${m.hospIncluidos??1} sistema${(m.hospIncluidos??1)===1?'':'s'} incluído${(m.hospIncluidos??1)===1?'':'s'} · +${fmt(m.hospAdicional??80)}/sistema extra</span>`:''}<br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td class="nowrap">${fmt(m.anual)}</td><td class="nowrap">${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
     modPaginacao.innerHTML=lista.length?`<div class="paginacao"><span class="muted">Mostrando ${ini+1}–${ini+visiveis.length} de ${lista.length} módulo(s)</span>${totalPag>1?`<div class="pag-btns"><button class="secondary" ${paginaMod<=1?'disabled':''} onclick="irPaginaMod(${paginaMod-1})">‹ Anterior</button><span class="muted">Página ${paginaMod} de ${totalPag}</span><button class="secondary" ${paginaMod>=totalPag?'disabled':''} onclick="irPaginaMod(${paginaMod+1})">Próxima ›</button></div>`:''}</div>`:'';
   }
   atualizarPreviewMassa();
