@@ -314,9 +314,10 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
         <div><label>Nome do Módulo</label><input id="mNome" placeholder="Ex.: Módulo de Relatórios"></div>
         <div><label>Sistema</label><select id="mSistema"></select></div>
         <div><label>Categoria</label><select id="mCat"></select></div>
-        <div><label>Valor mensal da licença (R$)</label><input id="mAnual" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        <div><label>Valor mensal da licença (R$)</label><input id="mAnual" type="number" data-ultimo="" min="0" step="0.01" placeholder="0,00"></div>
       </div>
       <div class="hosp-config">
+        <label class="chk-linha"><input type="checkbox" id="mGratuito" onchange="alternarGratuito()"> <span><b>🎁 Plano gratuito</b><br><small class="muted">Marque se este módulo é oferecido sem custo. O valor da licença fica em R$ 0,00 e ele aparece como "Gratuito" na tabela e nas propostas. Módulos gratuitos não contam para o desconto por volume nem entram em alterações de valor em massa.</small></span></label>
         <label class="chk-linha"><input type="checkbox" id="mSeparado"> <span><b>Sistema separado (não unificado)</b><br><small class="muted">Marque se este módulo entra em operação como um sistema à parte. Cada sistema separado conta como um sistema adicional na taxa de hospedagem. Módulos não marcados são unificados e, juntos, contam como um só sistema.</small></span></label>
         <label class="chk-linha"><input type="checkbox" id="mTaxaHosp" onchange="alternarCamposHosp()"> <span><b>Este módulo é a taxa de hospedagem e manutenção</b><br><small class="muted">A taxa base inclui uma quantidade de sistemas ativos. Os sistemas que passarem disso são cobrados com o valor adicional abaixo.</small></span></label>
         <div class="row" id="camposHosp" style="display:none;margin-top:4px">
@@ -579,8 +580,8 @@ function calcularNovoValor(atual,tipo,v){
   return atual;
 }
 function modulosAlvoMassa(){
-  if(massaAlvo.value==='filtrados')return filtrarModulosSistemas().modulosFiltrados;
-  return db.modulos.filter(m=>selecionadosMod.has(m.id));
+  const lista=massaAlvo.value==='filtrados'?filtrarModulosSistemas().modulosFiltrados:db.modulos.filter(m=>selecionadosMod.has(m.id));
+  return lista.filter(m=>!ehGratuito(m));
 }
 function atualizarPreviewMassa(){
   if(typeof massaPreview==='undefined')return;
@@ -694,12 +695,13 @@ function salvarModulo(){
   if(!nome)return alert('Informe o nome do módulo.');
   if(!mSistema.value)return alert('Selecione um sistema ou marque como módulo independente.');
   if(!mCat.value)return alert('Cadastre e selecione uma categoria.');
-  const anual=Number(mAnual.value)||0;if(anual<=0)return alert('Informe o valor mensal da licença.');
+  const gratuito=mGratuito.checked;
+  const anual=gratuito?0:(Number(mAnual.value)||0);if(!gratuito&&anual<=0)return alert('Informe o valor mensal da licença ou marque a opção Plano gratuito.');
   const taxaHospedagem=mTaxaHosp.checked;
   const hospIncluidos=Math.max(0,Math.floor(Number(mHospIncluidos.value)||0));
   const hospAdicional=Math.max(0,Number(mHospAdicional.value)||0);
   if(taxaHospedagem&&!hospAdicional&&!confirm('O valor adicional por sistema extra está zerado. Deseja salvar assim?'))return;
-  const dados={nome,sistemaId:mSistema.value==='independente'?'':mSistema.value,categoriaId:mCat.value,anual,desc:mDesc.value.trim(),
+  const dados={nome,sistemaId:mSistema.value==='independente'?'':mSistema.value,categoriaId:mCat.value,anual,gratuito,desc:mDesc.value.trim(),
     separado:taxaHospedagem?false:mSeparado.checked,taxaHospedagem,hospIncluidos:taxaHospedagem?hospIncluidos:undefined,hospAdicional:taxaHospedagem?hospAdicional:undefined};
   
   if(editandoModId){
@@ -719,7 +721,7 @@ function editarModulo(id){
   const m=db.modulos.find(x=>x.id===id);if(!m)return;
   editandoModId=id;
   mNome.value=m.nome;mSistema.value=m.sistemaId||'independente';mCat.value=m.categoriaId;mAnual.value=m.anual;mDesc.value=m.desc;
-  mSeparado.checked=!!m.separado;mTaxaHosp.checked=!!m.taxaHospedagem;mHospIncluidos.value=m.hospIncluidos??1;mHospAdicional.value=m.hospAdicional??80;alternarCamposHosp();
+  mGratuito.checked=!!m.gratuito;mSeparado.checked=!!m.separado;mTaxaHosp.checked=!!m.taxaHospedagem;mHospIncluidos.value=m.hospIncluidos??1;mHospAdicional.value=m.hospAdicional??80;alternarCamposHosp();
   tituloModulo.textContent='Editar Módulo';
   btnSalvarModulo.textContent='💾 Salvar Alterações';
   btnCancelarMod.style.display='inline-block';
@@ -730,7 +732,7 @@ function editarModulo(id){
 function limparModuloForm(){
   editandoModId=null;
   mNome.value=mAnual.value=mDesc.value='';
-  mSeparado.checked=false;mTaxaHosp.checked=false;mHospIncluidos.value=1;mHospAdicional.value=80;alternarCamposHosp();
+  mGratuito.checked=false;mSeparado.checked=false;mTaxaHosp.checked=false;mHospIncluidos.value=1;mHospAdicional.value=80;alternarCamposHosp();
   tituloModulo.textContent='Cadastrar Módulo';
   btnSalvarModulo.textContent='💾 Salvar Módulo';
   btnCancelarMod.style.display='none';
@@ -739,7 +741,23 @@ function limparModuloForm(){
 function alternarCamposHosp(){
   camposHosp.style.display=mTaxaHosp.checked?'grid':'none';
   mSeparado.disabled=mTaxaHosp.checked;if(mTaxaHosp.checked)mSeparado.checked=false;
+  if(mTaxaHosp.checked&&mGratuito.checked)mGratuito.checked=false;
+  mGratuito.disabled=mTaxaHosp.checked;
+  aplicarEstadoGratuito();
 }
+function alternarGratuito(){
+  if(mGratuito.checked){mAnual.dataset.ultimo=mAnual.value;}
+  else if(mAnual.dataset.ultimo&&Number(mAnual.value)===0){mAnual.value=mAnual.dataset.ultimo;}
+  aplicarEstadoGratuito();
+}
+function aplicarEstadoGratuito(){
+  mTaxaHosp.disabled=mGratuito.checked;
+  mAnual.disabled=mGratuito.checked;
+  if(mGratuito.checked)mAnual.value=0;
+}
+function ehGratuito(m){return !!(m&&m.gratuito);}
+function fmtMod(m,mult=1){return ehGratuito(m)?'Gratuito':fmt(Number(m.anual)*mult);}
+function qtdPagos(mods){return mods.filter(m=>m&&!ehGratuito(m)).length;}
 
 // ===== Taxa de hospedagem: sistemas em operação =====
 function normTxt(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
@@ -814,7 +832,7 @@ function cardModuloProposta(m,marcado){
         <input type="checkbox" value="${m.id}" ${marcado?'checked':''} onchange="calcularTotalProposta()" style="width:auto; margin-top:3px;">
         <div>
           <b>${esc(m.nome)}</b> <span class="badge info">${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria')}</span>${m.separado?' <span class="badge warn" title="Conta como sistema adicional na taxa de hospedagem">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok" title="Inclui ${m.hospIncluidos??1} sistema(s); adicional de ${fmt(m.hospAdicional??80)}/mês por sistema extra">Taxa de hospedagem · ${m.hospIncluidos??1} incluído(s) · +${fmt(m.hospAdicional??80)}/extra</span>`:''}
-          <div class="muted" style="font-size:12px; margin-top:3px;">Licença mensal: ${fmt(m.anual)} | 12 meses: ${fmt(Number(m.anual)*12)}</div>
+          <div class="muted" style="font-size:12px; margin-top:3px;">${ehGratuito(m)?'🎁 Plano gratuito · sem custo':`Licença mensal: ${fmt(m.anual)} | 12 meses: ${fmt(Number(m.anual)*12)}`}</div>
         </div>
       </label>
     </div>`;
@@ -853,7 +871,7 @@ function calcularCondicoes(mensal,qtd){
 }
 // As condições são sempre calculadas pela quantidade de módulos da proposta:
 // a partir de 10 módulos o desconto de 10% entra automaticamente, inclusive em propostas antigas.
-function condicoesProposta(p){return calcularCondicoes(p.mensal,(p.modulosIds||[]).length);}
+function condicoesProposta(p){return calcularCondicoes(p.mensal,qtdPagos((p.modulosIds||[]).map(id=>{const m=db.modulos.find(x=>x.id===id);if(!m)return {};const v=(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual;return {gratuito:!!m.gratuito&&Number(v)===0};})));}
 function recalcularProposta(p){
   const c=condicoesProposta(p);
   const campos={bruto:c.bruto,descontoVolume:c.descontoVolume,subtotal:c.subtotal,parcela:c.parcela,desconto:c.desconto,total:c.total};
@@ -874,16 +892,16 @@ function calcularTotalProposta(){
   linhaHosp.style.display=hosp.aplica?'block':'none';
   resHosp.textContent=hosp.adicionais?`${hosp.adicionais} × ${fmt(hosp.valorAdicional)} = ${fmt(hosp.valor)}/mês`:'sem adicional';
   resHospDet.textContent=hosp.aplica?textoHospedagem(hosp):'';
-  const qtd=checkboxes.length,c=calcularCondicoes(mensal,qtd);
+  const qtd=qtdPagos(modsSel),c=calcularCondicoes(mensal,qtd);
   resMensalProposta.textContent=fmt(c.mensal);resBruto.textContent=fmt(c.bruto);
   linhaDescVolume.style.display=linhaSubtotal.style.display=c.temVolume?'block':'none';
   resDescVolume.textContent='- '+fmt(c.descontoVolume);resSubtotal.textContent=fmt(c.subtotal);
   resDesconto.textContent=fmt(c.desconto);resTotal.textContent=fmt(c.total);
   resParcelas.textContent=`12 parcelas de ${fmt(c.parcela)}`;
   resParcelasObs.textContent=c.temVolume?'Já com 10% de desconto por volume.':'Sem desconto.';
-  if(!qtd){avisoVolume.textContent='';avisoVolume.className='aviso-volume';}
+  if(!qtd){avisoVolume.textContent=modsSel.length?'Somente módulos gratuitos selecionados.':'';avisoVolume.className='aviso-volume';}
   else if(c.temVolume){avisoVolume.textContent=`🎉 Desconto por volume aplicado: ${qtd} módulos selecionados (10% sobre o valor total).`;avisoVolume.className='aviso-volume ativo';}
-  else{const f=MIN_MODULOS_DESCONTO-qtd;avisoVolume.textContent=`💡 ${qtd} módulo(s) selecionado(s). ${f===1?'Falta 1 módulo':'Faltam '+f+' módulos'} para ganhar 10% de desconto por volume.`;avisoVolume.className='aviso-volume';}
+  else{const f=MIN_MODULOS_DESCONTO-qtd;avisoVolume.textContent=`💡 ${qtd} módulo(s) pago(s) selecionado(s). ${f===1?'Falta 1 módulo':'Faltam '+f+' módulos'} para ganhar 10% de desconto por volume.`;avisoVolume.className='aviso-volume';}
   atualizarDescricoesSelecionados();
 }
 
@@ -961,7 +979,7 @@ function salvarProposta(){
   mensal=somaMensalProposta(modsSel,oh);
   const hosp=calcularHospedagem(modsSel,oh);
   const mensalModulos=mensal;mensal=arred(mensal+hosp.valor);
-  const cond=calcularCondicoes(mensal,modulosIds.length);
+  const cond=calcularCondicoes(mensal,qtdPagos(modsSel));
   const {bruto,descontoVolume,subtotal,parcela,desconto,total}=cond;
   const meioPagamento=pMeioPagamento.value==='Outro'?(pMeioOutro.value.trim()||'Outro'):pMeioPagamento.value;
   const emailAceite=pEmailAceite.value.trim(),whatsAceite=pWhatsAceite.value.trim();
@@ -1054,13 +1072,13 @@ function alterarStatusProposta(id,status){const p=db.propostas.find(x=>x.id===id
 
 function dadosProposta(id){
   const p=db.propostas.find(x=>x.id===id);if(!p)return null;
-  return {p,cliente:db.clientes.find(x=>x.id===p.clienteId),sistema:db.sistemas.find(x=>x.id===p.sistemaId),modulos:p.modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return m?{...m,anual:(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual}:null;}).filter(Boolean)};
+  return {p,cliente:db.clientes.find(x=>x.id===p.clienteId),sistema:db.sistemas.find(x=>x.id===p.sistemaId),modulos:p.modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);if(!m)return null;const v=(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual;return {...m,anual:v,gratuito:!!m.gratuito&&Number(v)===0};}).filter(Boolean)};
 }
 function textoProposta(id){
   const d=dadosProposta(id);if(!d)return '';
   const c=condicoesProposta(d.p);
   const h=d.p.hospedagem;
-  const lista=d.modulos.map((m,i)=>`${i+1}. ${m.nome} (${fmt(m.anual)}/mês)`).join('\n')+(h&&h.adicionais?`\n+ Adicional de hospedagem: ${h.adicionais} sistema(s) × ${fmt(h.valorAdicional)} = ${fmt(h.valor)}/mês`:'');
+  const lista=d.modulos.map((m,i)=>`${i+1}. ${m.nome} (${ehGratuito(m)?'Gratuito':fmt(m.anual)+'/mês'})`).join('\n')+(h&&h.adicionais?`\n+ Adicional de hospedagem: ${h.adicionais} sistema(s) × ${fmt(h.valorAdicional)} = ${fmt(h.valor)}/mês`:'');
   return `PROPOSTA COMERCIAL Nº ${d.p.id.slice(0,8).toUpperCase()}\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\n\nMódulos (${d.modulos.length}):\n${lista}\n\nValor de 12 meses: ${fmt(c.bruto)}${c.temVolume?`\nDesconto por volume (10%): -${fmt(c.descontoVolume)}\nValor do contrato: ${fmt(c.subtotal)}`:''}\n\nOpção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)} (10% de desconto à vista)\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}\n\nA descrição completa de cada módulo está na proposta em PDF.`;
 }
 function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return n;}
@@ -1074,7 +1092,7 @@ function corpoEmailHtml(id){
   const d=dadosProposta(id);if(!d)return '';
   const c=condicoesProposta(d.p);
   const hE=d.p.hospedagem;
-  const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(m.anual)}/mês</td></tr>`).join('');
+  const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${ehGratuito(m)?'Gratuito':fmt(m.anual)+'/mês'}</td></tr>`).join('');
   return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table>${(()=>{const cl=clausulaHospedagem(d);return cl?`<div style="margin-top:18px;background:#fffaeb;border:1px solid #fedf89;border-left:4px solid #f79009;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.55;color:#344054"><b>Observação · Hospedagem e manutenção:</b> ${esc(cl.texto)}${cl.detalhe?`<br><span style="color:#667085">${esc(cl.detalhe)}</span>`:''}</div>`:''})()}<p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
 function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
@@ -1087,7 +1105,7 @@ function htmlProposta(id,modo='imprimir'){
   const cli=d.cliente||{};
   const linhas=d.modulos.map((m,i)=>{
     const desc=(m.desc||'').trim();
-    return `<tr><td class="n">${String(i+1).padStart(2,'0')}</td><td><div class="mod-nome">${esc(m.nome)}${nomeCat(m)?`<span class="cat">${esc(nomeCat(m))}</span>`:''}</div><p class="mod-desc${desc?'':' vazia'}">${desc?esc(desc):'Descrição não informada.'}</p></td><td class="v">${fmt(m.anual)}</td><td class="v">${fmt(Number(m.anual)*12)}</td></tr>`;
+    return `<tr><td class="n">${String(i+1).padStart(2,'0')}</td><td><div class="mod-nome">${esc(m.nome)}${nomeCat(m)?`<span class="cat">${esc(nomeCat(m))}</span>`:''}</div><p class="mod-desc${desc?'':' vazia'}">${desc?esc(desc):'Descrição não informada.'}</p></td><td class="v">${fmtMod(m)}</td><td class="v">${fmtMod(m,12)}</td></tr>`;
   }).join('');
   const hP=d.p.hospedagem;
   const linhaHosp=hP&&hP.adicionais?`<tr class="linha-hosp"><td class="n">+</td><td><div class="mod-nome">Adicional de hospedagem<span class="cat">${hP.adicionais} sistema${hP.adicionais===1?'':'s'} × ${fmt(hP.valorAdicional)}</span></div><p class="mod-desc">${esc(textoHospedagem(hP))}</p></td><td class="v">${fmt(hP.valor)}</td><td class="v">${fmt(hP.valor*12)}</td></tr>`:'';
@@ -1403,7 +1421,7 @@ function atualizarTudo(){
     const ini=porPag===Infinity?0:(paginaMod-1)*porPag;
     const visiveis=porPag===Infinity?lista:lista.slice(ini,ini+porPag);
     const todosVisSel=visiveis.length&&visiveis.every(m=>selecionadosMod.has(m.id));
-    modTabela.innerHTML=visiveis.length?`<table><thead><tr><th style="width:36px"><input type="checkbox" class="chk-mod" title="Selecionar todos desta página" ${todosVisSel?'checked':''} onchange="alternarSelecaoVisiveis(this.checked)"></th><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${visiveis.map(m=>{const sel=selecionadosMod.has(m.id);return `<tr class="${sel?'mod-sel':''}"><td data-label="Selecionar"><input type="checkbox" class="chk-mod" data-id="${m.id}" ${sel?'checked':''} onchange="alternarSelecaoMod('${m.id}',this.checked)" aria-label="Selecionar ${esc(m.nome)}"></td><td><b>${esc(m.nome)}</b>${m.separado?' <span class="badge warn">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok">Taxa de hospedagem · ${m.hospIncluidos??1} sistema${(m.hospIncluidos??1)===1?'':'s'} incluído${(m.hospIncluidos??1)===1?'':'s'} · +${fmt(m.hospAdicional??80)}/sistema extra</span>`:''}<br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td class="nowrap">${fmt(m.anual)}</td><td class="nowrap">${fmt(Number(m.anual)*12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
+    modTabela.innerHTML=visiveis.length?`<table><thead><tr><th style="width:36px"><input type="checkbox" class="chk-mod" title="Selecionar todos desta página" ${todosVisSel?'checked':''} onchange="alternarSelecaoVisiveis(this.checked)"></th><th>Módulo</th><th>Sistema</th><th>Categoria</th><th>Licença mensal</th><th>Contrato (12 meses)</th><th>Ações</th></tr></thead><tbody>${visiveis.map(m=>{const sel=selecionadosMod.has(m.id);return `<tr class="${sel?'mod-sel':''}"><td data-label="Selecionar"><input type="checkbox" class="chk-mod" data-id="${m.id}" ${sel?'checked':''} onchange="alternarSelecaoMod('${m.id}',this.checked)" aria-label="Selecionar ${esc(m.nome)}"></td><td><b>${esc(m.nome)}</b>${ehGratuito(m)?' <span class="badge ok">🎁 Plano gratuito</span>':''}${m.separado?' <span class="badge warn">Sistema separado</span>':''}${m.taxaHospedagem?` <span class="badge ok">Taxa de hospedagem · ${m.hospIncluidos??1} sistema${(m.hospIncluidos??1)===1?'':'s'} incluído${(m.hospIncluidos??1)===1?'':'s'} · +${fmt(m.hospAdicional??80)}/sistema extra</span>`:''}<br><small class="muted">${esc(m.desc)}</small></td><td>${m.sistemaId?esc(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||'-'):'<span class="badge info">Independente</span>'}</td><td>${esc(db.categorias.find(c=>c.id===m.categoriaId)?.nome||'-')}</td><td class="nowrap">${fmtMod(m)}</td><td class="nowrap">${fmtMod(m,12)}</td><td class="nowrap"><button class="secondary" onclick="editarModulo('${m.id}')">✏️ Editar</button> <button class="danger" onclick="excluirModulo('${m.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.modulos.length&&buscaAtiva?'Nenhum módulo encontrado para esta busca.':'Nenhum módulo cadastrado.'}</div>`;
     modPaginacao.innerHTML=lista.length?`<div class="paginacao"><span class="muted">Mostrando ${ini+1}–${ini+visiveis.length} de ${lista.length} módulo(s)</span>${totalPag>1?`<div class="pag-btns"><button class="secondary" ${paginaMod<=1?'disabled':''} onclick="irPaginaMod(${paginaMod-1})">‹ Anterior</button><span class="muted">Página ${paginaMod} de ${totalPag}</span><button class="secondary" ${paginaMod>=totalPag?'disabled':''} onclick="irPaginaMod(${paginaMod+1})">Próxima ›</button></div>`:''}</div>`:'';
   }
   atualizarPreviewMassa();
