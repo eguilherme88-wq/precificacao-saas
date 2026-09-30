@@ -190,6 +190,9 @@ tr.mod-sel td{background:#f5f8ff}
 html[data-theme="dark"] .chip{background:#172f5c;color:#9dc2ff}html[data-theme="dark"] .chip.neutro{background:#22304f;color:var(--dark)}html[data-theme="dark"] .chip.verde{background:#0f3a28;color:#6ce9a6}
 html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"] .massa-preview{background:#12203a}
 @media(max-width:800px){.filtro-acoes{width:100%}.filtro-acoes select{flex:1}.filtro-rodape{align-items:stretch}table.tabela-responsiva td[data-label="Selecionar"]{text-align:right}table.tabela-responsiva tr.mod-sel{background:#f5f8ff;border-color:var(--primary)}html[data-theme="dark"] table.tabela-responsiva tr.mod-sel{background:#1a2a4d}}
+@keyframes pulsoEdicao{0%{box-shadow:0 0 0 0 rgba(21,94,239,.55)}100%{box-shadow:0 0 0 14px rgba(21,94,239,0)}}
+.card{scroll-margin-top:110px}
+.card-editando{animation:pulsoEdicao 1s ease-out 2;outline:2px solid #155eef;outline-offset:2px}
 </style>
 <script>(function(){try{var t=localStorage.getItem("precificacao_tema");if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 </head>
@@ -213,7 +216,8 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
   </div>
   <nav class="nav">
     <button class="tab active" onclick="abrir('dashboard',this)">📊 Dashboard</button>
-    <button class="tab" onclick="abrir('modulos',this)">🧩 Módulos e Sistemas</button>
+    <button class="tab" onclick="abrir('sistemas',this)">🖥️ Sistemas</button>
+    <button class="tab" onclick="abrir('modulos',this)">🧩 Módulos</button>
     <button class="tab" onclick="abrir('categorias',this)">🏷️ Categorias</button>
     <button class="tab" onclick="abrir('clientes',this)">👥 Clientes</button>
     <button class="tab" onclick="abrir('proposta',this)">📄 Montar Proposta</button>
@@ -253,11 +257,32 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
     </div>
   </section>
 
+  <section id="sistemas" class="section">
+    <div class="card form-card">
+      <h2 class="title">🔎 Buscar Sistema</h2>
+      <div class="row">
+        <div><label>Pesquisar</label><input id="buscaSis" placeholder="Digite o nome, categoria ou descrição do sistema..." oninput="atualizarTudo()"></div>
+        <div><label>Filtrar por Categoria</label><select id="buscaSisCat" onchange="atualizarTudo()"><option value="">Todas as categorias</option></select></div>
+      </div>
+      <div class="filtro-rodape"><div class="chips" id="contadorSis"></div><div class="filtro-acoes"><button class="secondary" onclick="buscaSis.value='';buscaSisCat.value='';atualizarTudo()">↺ Limpar filtros</button></div></div>
+    </div>
+    <div class="card form-card">
+      <h2 class="title" id="tituloSistema">Cadastrar Sistema</h2>
+      <div class="row row3">
+        <div><label>Nome do Sistema</label><input id="sNome" placeholder="Ex.: Sistema de SST"></div>
+        <div><label>Categoria (opcional)</label><select id="sCat" onchange="preencherDescPorCategoria()"></select></div>
+        <div><label>Descrição do Sistema</label><input id="sDesc" placeholder="Descreva resumidamente o sistema"></div>
+      </div>
+      <div class="actions"><button class="primary" id="btnSalvarSistema" onclick="salvarSistema()">💾 Salvar Sistema</button><button class="secondary" onclick="limparSistemaForm()">↺ Limpar</button><button class="danger" id="btnCancelarSis" style="display:none" onclick="limparSistemaForm()">Cancelar edição</button></div>
+    </div>
+    <div class="card"><div id="sisTabela"></div></div>
+  </section>
+
   <section id="modulos" class="section">
     <div class="card form-card">
-      <h2 class="title">🔎 Buscar Sistema ou Módulo</h2>
+      <h2 class="title">🔎 Buscar Módulo</h2>
       <div class="row">
-        <div><label>Pesquisar</label><input id="buscaModSis" placeholder="Digite o nome do sistema, módulo, categoria ou descrição..." oninput="filtrarMod()"></div>
+        <div><label>Pesquisar</label><input id="buscaModSis" placeholder="Digite o nome do módulo, sistema, categoria ou descrição..." oninput="filtrarMod()"></div>
         <div><label>Filtrar por Categoria</label><select id="buscaModSisCat" onchange="filtrarMod()"><option value="">Todas as categorias</option></select></div>
       </div>
       <div class="row4" style="margin-top:12px">
@@ -284,17 +309,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
       <small class="muted" style="display:block;margin-top:10px">Ao pesquisar o nome de um sistema, os módulos vinculados a ele aparecem automaticamente na lista de módulos abaixo.</small>
     </div>
     <div class="card form-card">
-      <h2 class="title" id="tituloSistema">Cadastrar Sistema</h2>
-      <div class="row row3">
-        <div><label>Nome do Sistema</label><input id="sNome" placeholder="Ex.: Sistema de SST"></div>
-        <div><label>Categoria (opcional)</label><select id="sCat" onchange="preencherDescPorCategoria()"></select></div>
-        <div><label>Descrição do Sistema</label><input id="sDesc" placeholder="Descreva resumidamente o sistema"></div>
-      </div>
-      <div class="actions"><button class="primary" id="btnSalvarSistema" onclick="salvarSistema()">💾 Salvar Sistema</button><button class="secondary" onclick="limparSistemaForm()">↺ Limpar</button><button class="danger" id="btnCancelarSis" style="display:none" onclick="limparSistemaForm()">Cancelar edição</button></div>
-    </div>
-    <div class="card form-card"><div id="sisTabela"></div></div>
-    <div class="card form-card">
-      <h2 class="title" id="tituloModulo">Cadastrar Módulo do Sistema</h2>
+      <h2 class="title" id="tituloModulo">Cadastrar Módulo</h2>
       <div class="row row4">
         <div><label>Nome do Módulo</label><input id="mNome" placeholder="Ex.: Módulo de Relatórios"></div>
         <div><label>Sistema</label><select id="mSistema"></select></div>
@@ -527,7 +542,7 @@ function filtrarModulosSistemas(){
 }
 function filtrarMod(){paginaMod=1;atualizarTudo();}
 function limparFiltrosMod(){buscaModSis.value='';buscaModSisCat.value='';buscaModSistema.value='';buscaValMin.value='';buscaValMax.value='';buscaOrdem.value='cadastro';filtrarMod();}
-function verModulosDoSistema(id){limparFiltrosMod();buscaModSistema.value=id;filtrarMod();modTabela.scrollIntoView({behavior:'smooth',block:'start'});}
+function verModulosDoSistema(id){abrir('modulos');limparFiltrosMod();buscaModSistema.value=id;filtrarMod();modTabela.scrollIntoView({behavior:'smooth',block:'start'});}
 function ordenarModulos(lista){
   const nomeSis=m=>m.sistemaId?(db.sistemas.find(s=>s.id===m.sistemaId)?.nome||''):'~';
   const cmp=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'});
@@ -619,9 +634,18 @@ function persist(){localStorage.setItem(KEY_P,JSON.stringify(db));atualizarTudo(
 function abrir(id,el){
   document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  el=el||document.querySelector(`.tab[onclick*="'${id}'"]`);
   if(el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
   if(id==='proposta') { renderizarCheckModulos(); calcularTotalProposta(); }
   document.body.dataset.secao=id; fecharMenu(); window.scrollTo({top:0});
+}
+function focarFormulario(tituloEl,campo){
+  const card=tituloEl.closest('.card');
+  requestAnimationFrame(()=>{
+    card.scrollIntoView({behavior:'smooth',block:'start'});
+    card.classList.remove('card-editando');void card.offsetWidth;card.classList.add('card-editando');
+    setTimeout(()=>campo&&campo.focus({preventScroll:true}),400);
+  });
 }
 function alternarMenu(){document.body.classList.toggle('menu-aberto')}
 function fecharMenu(){document.body.classList.remove('menu-aberto')}
@@ -642,7 +666,7 @@ function fmt(v){return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFract
 function alternarOutroPagamento(){pMeioOutro.style.display=pMeioPagamento.value==='Outro'?'block':'none';if(pMeioPagamento.value!=='Outro')pMeioOutro.value='';}
 
 function salvarSistema(){const nome=sNome.value.trim();if(!nome)return alert('Informe o nome do sistema.');const dados={nome,categoriaId:sCat.value||'',desc:sDesc.value.trim()};if(editandoSisId){const i=db.sistemas.findIndex(x=>x.id===editandoSisId);if(i>=0)db.sistemas[i]={...db.sistemas[i],...dados}}else db.sistemas.push({id:crypto.randomUUID(),...dados});persist();limparSistemaForm();}
-function editarSistema(id){const s=db.sistemas.find(x=>x.id===id);if(!s)return;editandoSisId=id;sNome.value=s.nome;sCat.value=db.categorias.some(c=>c.id===s.categoriaId)?s.categoriaId:'';sDesc.value=s.desc||'';tituloSistema.textContent='Editar Sistema';btnSalvarSistema.textContent='💾 Salvar Alterações';btnCancelarSis.style.display='inline-block';}
+function editarSistema(id){const s=db.sistemas.find(x=>x.id===id);if(!s)return;editandoSisId=id;sNome.value=s.nome;sCat.value=db.categorias.some(c=>c.id===s.categoriaId)?s.categoriaId:'';sDesc.value=s.desc||'';tituloSistema.textContent='Editar Sistema';btnSalvarSistema.textContent='💾 Salvar Alterações';btnCancelarSis.style.display='inline-block';abrir('sistemas');focarFormulario(tituloSistema,sNome);}
 function preencherDescPorCategoria(){const c=db.categorias.find(x=>x.id===sCat.value);if(!c)return;if(!c.desc)return alert('A categoria "'+c.nome+'" não possui descrição cadastrada. Preencha a descrição do sistema manualmente ou edite a categoria.');sDesc.value=c.desc;}
 function limparSistemaForm(){editandoSisId=null;sNome.value=sDesc.value='';sCat.value='';tituloSistema.textContent='Cadastrar Sistema';btnSalvarSistema.textContent='💾 Salvar Sistema';btnCancelarSis.style.display='none';}
 function excluirSistema(id){if(db.modulos.some(m=>m.sistemaId===id))return alert('Não é possível excluir: há módulos vinculados a este sistema.');if(confirm('Excluir este sistema?')){db.sistemas=db.sistemas.filter(x=>x.id!==id);persist();}}
@@ -698,13 +722,14 @@ function editarModulo(id){
   btnSalvarModulo.textContent='💾 Salvar Alterações';
   btnCancelarMod.style.display='inline-block';
   abrir('modulos');
+  focarFormulario(tituloModulo,mNome);
 }
 
 function limparModuloForm(){
   editandoModId=null;
   mNome.value=mAnual.value=mDesc.value='';
   mSeparado.checked=false;mTaxaHosp.checked=false;mHospIncluidos.value=1;mHospAdicional.value=80;alternarCamposHosp();
-  tituloModulo.textContent='Cadastrar Módulo do Sistema';
+  tituloModulo.textContent='Cadastrar Módulo';
   btnSalvarModulo.textContent='💾 Salvar Módulo';
   btnCancelarMod.style.display='none';
 }
@@ -870,7 +895,7 @@ function atualizarDescricoesSelecionados(){
   painel.innerHTML=`<h3>📝 Descrição dos módulos selecionados (${sel.length})</h3>`+sel.map(m=>{
     const cat=db.categorias.find(c=>c.id===m.categoriaId)?.nome||'Sem categoria';
     const desc=(m.desc||'').trim();
-    return `<div class="desc-item"><b>${esc(m.nome)} <span class="badge info">${esc(cat)}</span></b><p${desc?'':' class="muted"'}>${desc?esc(desc):'Este módulo ainda não possui descrição cadastrada. Edite-o em Módulos e Sistemas para incluir.'}</p></div>`;
+    return `<div class="desc-item"><b>${esc(m.nome)} <span class="badge info">${esc(cat)}</span></b><p${desc?'':' class="muted"'}>${desc?esc(desc):'Este módulo ainda não possui descrição cadastrada. Edite-o no menu Módulos para incluir.'}</p></div>`;
   }).join('');
 }
 
@@ -1348,10 +1373,23 @@ function atualizarTudo(){
   const {sistemasFiltrados,modulosFiltrados}=filtrarModulosSistemas();
   const buscaAtiva=(buscaModSis?.value?.trim()||buscaModSisCat?.value||buscaModSistema?.value||buscaValMin?.value||buscaValMax?.value||'');
   const somaFiltrados=modulosFiltrados.reduce((a,m)=>a+(Number(m.anual)||0),0);
-  contadorFiltro.innerHTML=`<span class="chip">📦 ${modulosFiltrados.length} de ${db.modulos.length} módulo(s)</span><span class="chip neutro">🧩 ${sistemasFiltrados.length} de ${db.sistemas.length} sistema(s)</span><span class="chip verde">💰 Soma mensal: ${fmt(somaFiltrados)}</span>`+(selecionadosMod.size?`<span class="chip">☑ ${selecionadosMod.size} selecionado(s)</span>`:'');
+  contadorFiltro.innerHTML=`<span class="chip">📦 ${modulosFiltrados.length} de ${db.modulos.length} módulo(s)</span><span class="chip verde">💰 Soma mensal: ${fmt(somaFiltrados)}</span>`+(selecionadosMod.size?`<span class="chip">☑ ${selecionadosMod.size} selecionado(s)</span>`:'');
   const qtdModSis=id=>db.modulos.filter(m=>m.sistemaId===id);
+  {
+    const optsCatSis='<option value="">Todas as categorias</option>'+db.categorias.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+    if(buscaSisCat.innerHTML!==optsCatSis){const a=buscaSisCat.value;buscaSisCat.innerHTML=optsCatSis;if(db.categorias.some(c=>c.id===a))buscaSisCat.value=a;}
+  }
+  const termoSis=normaliza(buscaSis.value.trim()),catSis=buscaSisCat.value;
+  const listaSistemas=db.sistemas.filter(s=>{
+    if(catSis&&s.categoriaId!==catSis)return false;
+    if(!termoSis)return true;
+    const cat=db.categorias.find(c=>c.id===s.categoriaId)?.nome||'';
+    return normaliza(s.nome+' '+(s.desc||'')+' '+cat).includes(termoSis);
+  });
+  const buscaSisAtiva=!!(termoSis||catSis);
+  contadorSis.innerHTML=`<span class="chip">🖥️ ${listaSistemas.length} de ${db.sistemas.length} sistema(s)</span>`;
 
-  sisTabela.innerHTML=sistemasFiltrados.length?`<table><thead><tr><th>Sistema</th><th>Categoria</th><th>Descrição</th><th>Módulos</th><th>Soma mensal</th><th>Ações</th></tr></thead><tbody>${sistemasFiltrados.map(s=>{const ms=qtdModSis(s.id);return `<tr><td><b>${esc(s.nome)}</b></td><td>${esc(db.categorias.find(c=>c.id===s.categoriaId)?.nome||'-')}</td><td>${esc(s.desc)}</td><td class="qtd-mod">${ms.length?`<button class="btn-link" onclick="verModulosDoSistema('${s.id}')" title="Ver módulos deste sistema">${ms.length} módulo(s)</button>`:'<span class="muted">0</span>'}</td><td class="nowrap">${fmt(ms.reduce((a,m)=>a+(Number(m.anual)||0),0))}</td><td><button class="secondary" onclick="editarSistema('${s.id}')">✏️ Editar</button> <button class="danger" onclick="excluirSistema('${s.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.sistemas.length&&buscaAtiva?'Nenhum sistema encontrado para esta busca.':'Nenhum sistema cadastrado.'}</div>`;
+  sisTabela.innerHTML=listaSistemas.length?`<table><thead><tr><th>Sistema</th><th>Categoria</th><th>Descrição</th><th>Módulos</th><th>Soma mensal</th><th>Ações</th></tr></thead><tbody>${listaSistemas.map(s=>{const ms=qtdModSis(s.id);return `<tr><td><b>${esc(s.nome)}</b></td><td>${esc(db.categorias.find(c=>c.id===s.categoriaId)?.nome||'-')}</td><td>${esc(s.desc)}</td><td class="qtd-mod">${ms.length?`<button class="btn-link" onclick="verModulosDoSistema('${s.id}')" title="Ver módulos deste sistema">${ms.length} módulo(s)</button>`:'<span class="muted">0</span>'}</td><td class="nowrap">${fmt(ms.reduce((a,m)=>a+(Number(m.anual)||0),0))}</td><td><button class="secondary" onclick="editarSistema('${s.id}')">✏️ Editar</button> <button class="danger" onclick="excluirSistema('${s.id}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:`<div class="empty">${db.sistemas.length&&buscaSisAtiva?'Nenhum sistema encontrado para esta busca.':'Nenhum sistema cadastrado.'}</div>`;
   catTabela.innerHTML=db.categorias.length?`<table><thead><tr><th>Categoria</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>${db.categorias.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.desc)}</td><td><button class="secondary" onclick="editarCategoria('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCategoria('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhuma categoria cadastrada.</div>';
   cliTabela.innerHTML=db.clientes.length?`<table><thead><tr><th>Cliente / Empresa</th><th>CPF / CNPJ</th><th>Contato</th><th>Telefone</th><th>E-mail</th><th>Cidade</th><th>Ações</th></tr></thead><tbody>${db.clientes.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.documento||'-')}</td><td>${esc(c.contato||'-')}</td><td>${esc(c.telefone||'-')}</td><td>${esc(c.email||'-')}</td><td>${esc(c.cidade||'-')}</td><td class="nowrap"><button class="secondary" onclick="editarCliente('${c.id}')">✏️ Editar</button> <button class="danger" onclick="excluirCliente('${c.id}')">Excluir</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum cliente cadastrado.</div>';
 
