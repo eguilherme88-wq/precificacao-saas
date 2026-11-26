@@ -40,6 +40,7 @@ table{width:100%;border-collapse:collapse;background:white;border-radius:12px;ov
 @media(max-width:1100px){.grid,.row4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.sidebar{width:190px}header{left:190px}.container{margin-left:190px}.row,.row3{grid-template-columns:1fr}.grid,.row4{grid-template-columns:1fr}}
 /* ===== Celular / tablet ===== */
+.opc-card{position:relative;transition:opacity .2s}.opc-card.opc-off{opacity:.45;border-style:dashed!important}.opc-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin:0 0 10px;cursor:pointer;width:auto}.opc-check input{width:18px;height:18px;margin:0;accent-color:var(--primary)}
 .menu-btn{display:none}.menu-backdrop{display:none}
 header .header-text{min-width:0}
 @media(max-width:800px){
@@ -434,9 +435,10 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
         <p style="margin:5px 0;display:none" id="linhaDescVolume"><b>Desconto por volume (10% a partir de 10 módulos):</b> <span id="resDescVolume" style="color:#079455;font-weight:700">- R$ 0,00</span></p>
         <p style="margin:5px 0;display:none" id="linhaSubtotal"><b>Valor do contrato com desconto:</b> <span id="resSubtotal">R$ 0,00</span></p>
         <div id="avisoVolume" class="aviso-volume"></div>
+        <p class="muted" style="margin:12px 0 0">Marque quais formas de pagamento vão aparecer no orçamento (uma ou as duas).</p>
         <div class="row" style="margin-top:14px">
-          <div class="card" style="border:2px solid #155eef;background:#fff"><span class="badge info">OPÇÃO 1</span><h3 style="margin:10px 0 6px">Pagamento em 12 meses</h3><b id="resParcelas" style="font-size:20px">12 parcelas de R$ 0,00</b><p class="muted" id="resParcelasObs">Sem desconto.</p></div>
-          <div class="card" style="border:2px solid #079455;background:#fff"><span class="badge ok">OPÇÃO 2</span><h3 style="margin:10px 0 6px">Pagamento à vista</h3><b id="resTotal" style="font-size:20px">R$ 0,00</b><p class="muted">Desconto de 10% à vista: <span id="resDesconto">R$ 0,00</span></p></div>
+          <div class="card opc-card" id="cardOpc1" style="border:2px solid #155eef;background:#fff"><label class="opc-check"><input type="checkbox" id="pOpc1" checked onchange="atualizarOpcoesForm(this)"> Incluir no orçamento</label><span class="badge info">OPÇÃO 1</span><h3 style="margin:10px 0 6px">Pagamento em 12 meses</h3><b id="resParcelas" style="font-size:20px">12 parcelas de R$ 0,00</b><p class="muted" id="resParcelasObs">Sem desconto.</p></div>
+          <div class="card opc-card" id="cardOpc2" style="border:2px solid #079455;background:#fff"><label class="opc-check"><input type="checkbox" id="pOpc2" checked onchange="atualizarOpcoesForm(this)"> Incluir no orçamento</label><span class="badge ok">OPÇÃO 2</span><h3 style="margin:10px 0 6px">Pagamento à vista</h3><b id="resTotal" style="font-size:20px">R$ 0,00</b><p class="muted">Desconto de 10% à vista: <span id="resDesconto">R$ 0,00</span></p></div>
         </div>
       </div>
 
@@ -881,6 +883,11 @@ function calcularCondicoes(mensal,qtd){
 }
 // As condições são sempre calculadas pela quantidade de módulos da proposta:
 // a partir de 10 módulos o desconto de 10% entra automaticamente, inclusive em propostas antigas.
+function opcoesPagamento(p){const o=p&&p.opcoesPagamento;const r={parcelado:!o||o.parcelado!==false,avista:!o||o.avista!==false};if(!r.parcelado&&!r.avista){r.parcelado=r.avista=true;}r.ambas=r.parcelado&&r.avista;return r;}
+function atualizarOpcoesForm(el){
+  if(el&&!pOpc1.checked&&!pOpc2.checked){el.checked=true;alert('Deixe pelo menos uma opção de pagamento marcada.');}
+  cardOpc1.classList.toggle('opc-off',!pOpc1.checked);cardOpc2.classList.toggle('opc-off',!pOpc2.checked);
+}
 function condicoesProposta(p){return calcularCondicoes(p.mensal,qtdPagos((p.modulosIds||[]).map(id=>{const m=db.modulos.find(x=>x.id===id);if(!m)return {};const v=(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual;return {gratuito:!!m.gratuito&&Number(v)===0};})));}
 function recalcularProposta(p){
   const c=condicoesProposta(p);
@@ -994,6 +1001,7 @@ function salvarProposta(){
   const meioPagamento=pMeioPagamento.value==='Outro'?(pMeioOutro.value.trim()||'Outro'):pMeioPagamento.value;
   const emailAceite=pEmailAceite.value.trim(),whatsAceite=pWhatsAceite.value.trim();
   if(!emailAceite&&!whatsAceite)return alert('Informe um e-mail ou WhatsApp para receber o aceite da proposta.');
+  if(!pOpc1.checked&&!pOpc2.checked)return alert('Marque pelo menos uma opção de pagamento (Opção 1 ou Opção 2).');
 
   const proposta={
     id:crypto.randomUUID(),
@@ -1005,7 +1013,7 @@ function salvarProposta(){
     modulosIds,
     valores:Object.fromEntries(modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return [id,m?.taxaHospedagem&&oh.taxa!=null?Number(oh.taxa):Number(m?.anual)||0];})),
     mensalModulos,hospedagem:hosp.aplica?{taxaBase:hosp.taxaBase,adicionais:hosp.adicionais,valorAdicional:hosp.valorAdicional,valor:hosp.valor,incluidos:hosp.incluidos,sistemas:hosp.sistemas}:null,
-    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:'duas_opcoes',meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
+    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:(pOpc1.checked&&pOpc2.checked)?'duas_opcoes':(pOpc1.checked?'parcelado':'avista'),opcoesPagamento:{parcelado:pOpc1.checked,avista:pOpc2.checked},meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
 
@@ -1055,6 +1063,7 @@ function editarProposta(id){
   if(opcoes.includes(p.meioPagamento)){pMeioPagamento.value=p.meioPagamento;alternarOutroPagamento();}
   else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
   pCondicao.value=p.condicao||'';
+  {const op=opcoesPagamento(p);pOpc1.checked=op.parcelado;pOpc2.checked=op.avista;atualizarOpcoesForm();}
   {const hm=db.modulos.find(m=>m.taxaHospedagem&&ids.has(m.id));
    if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;pHospIncluidos.value=p.hospedagem?.incluidos??hm.hospIncluidos??1;}}
   pEmailAceite.value=p.emailAceite||pEmailAceite.value;
@@ -1069,7 +1078,7 @@ function limparPropostaForm(){
   if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';pHospIncluidos.value='';}
   editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
-  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';
+  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';pOpc1.checked=pOpc2.checked=true;atualizarOpcoesForm();
   pData.value=new Date().toISOString().slice(0,10);
   renderizarCheckModulos();
   calcularTotalProposta();
@@ -1089,7 +1098,7 @@ function textoProposta(id){
   const c=condicoesProposta(d.p);
   const h=d.p.hospedagem;
   const lista=d.modulos.map((m,i)=>`${i+1}. ${m.nome} (${ehGratuito(m)?'Gratuito':fmt(m.anual)+'/mês'})`).join('\n')+(h&&h.adicionais?`\n+ Adicional de hospedagem: ${h.adicionais} sistema(s) × ${fmt(h.valorAdicional)} = ${fmt(h.valor)}/mês`:'');
-  return `PROPOSTA COMERCIAL Nº ${d.p.id.slice(0,8).toUpperCase()}\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\n\nMódulos (${d.modulos.length}):\n${lista}\n\nValor de 12 meses: ${fmt(c.bruto)}${c.temVolume?`\nDesconto por volume (10%): -${fmt(c.descontoVolume)}\nValor do contrato: ${fmt(c.subtotal)}`:''}\n\nOpção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)} (10% de desconto à vista)\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}\n\nA descrição completa de cada módulo está na proposta em PDF.`;
+  return `PROPOSTA COMERCIAL Nº ${d.p.id.slice(0,8).toUpperCase()}\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\n\nMódulos (${d.modulos.length}):\n${lista}\n\nValor de 12 meses: ${fmt(c.bruto)}${c.temVolume?`\nDesconto por volume (10%): -${fmt(c.descontoVolume)}\nValor do contrato: ${fmt(c.subtotal)}`:''}\n\n${(()=>{const op=opcoesPagamento(d.p);return op.ambas?`Opção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)} (10% de desconto à vista)`:op.parcelado?`Pagamento: 12 parcelas de ${fmt(c.parcela)}`:`Pagamento: à vista por ${fmt(c.total)} (10% de desconto à vista)`;})()}\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}\n\nA descrição completa de cada módulo está na proposta em PDF.`;
 }
 function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return n;}
 function linkAceite(p){
@@ -1103,7 +1112,7 @@ function corpoEmailHtml(id){
   const c=condicoesProposta(d.p);
   const hE=d.p.hospedagem;
   const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${ehGratuito(m)?'Gratuito':fmt(m.anual)+'/mês'}</td></tr>`).join('');
-  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">Opções comerciais</h2><table style="width:100%;border-spacing:10px 0"><tr><td style="width:50%;padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td><td style="width:50%;padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td></tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">${opcoesPagamento(d.p).ambas?'Opções comerciais':'Condição de pagamento'}</h2><table style="width:100%;border-spacing:10px 0"><tr>${opcoesPagamento(d.p).parcelado?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">PARCELADO</div><div style="font-size:21px;font-weight:bold;margin:8px 0">12 × ${fmt(c.parcela)}</div><div style="color:#667085;font-size:13px">Total: ${fmt(c.subtotal)}</div></td>`:''}${opcoesPagamento(d.p).avista?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td>`:''}</tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
 function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
 function htmlProposta(id,modo='imprimir'){
@@ -1227,8 +1236,8 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
       ${c.temVolume?`<div class="selo"><b>Desconto por volume aplicado.</b> Propostas a partir de ${MIN_MODULOS_DESCONTO} módulos recebem 10% de desconto sobre o valor total. Esta proposta inclui ${c.qtd} módulos.</div>`:''}
     </div>
     <div class="opcoes">
-      <div class="opcao"><div class="rot">Opção 1 · Parcelado</div><div class="valor">12 × ${fmt(c.parcela)}</div><div class="obs">Total de ${fmt(c.subtotal)}${c.temVolume?', já com desconto por volume':''}</div></div>
-      <div class="opcao destaque"><div class="rot">Opção 2 · À vista · 10% off</div><div class="valor">${fmt(c.total)}</div><div class="obs">Economia de ${fmt(c.desconto+c.descontoVolume)} sobre o valor anual</div></div>
+      ${opcoesPagamento(d.p).parcelado?`<div class="opcao"><div class="rot">${opcoesPagamento(d.p).ambas?'Opção 1 · ':''}Parcelado</div><div class="valor">12 × ${fmt(c.parcela)}</div><div class="obs">Total de ${fmt(c.subtotal)}${c.temVolume?', já com desconto por volume':''}</div></div>`:''}
+      ${opcoesPagamento(d.p).avista?`<div class="opcao destaque"><div class="rot">${opcoesPagamento(d.p).ambas?'Opção 2 · ':''}À vista · 10% off</div><div class="valor">${fmt(c.total)}</div><div class="obs">Economia de ${fmt(c.desconto+c.descontoVolume)} sobre o valor anual</div></div>`:''}
     </div>
   </div>
 
@@ -1236,7 +1245,8 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
   <ul class="cond">
     <li>Licença de uso dos módulos listados pelo período de 12 meses.</li>
     <li>Meio de pagamento: <b>${esc(d.p.meioPagamento||'-')}</b>.</li>
-    <li>Pagamento à vista com 10% de desconto sobre o valor do contrato.</li>
+    ${opcoesPagamento(d.p).parcelado?`<li>Pagamento parcelado em 12 vezes de ${fmt(c.parcela)}.</li>`:''}
+    ${opcoesPagamento(d.p).avista?'<li>Pagamento à vista com 10% de desconto sobre o valor do contrato.</li>':''}
     <li>Desconto por volume de 10% para propostas a partir de ${MIN_MODULOS_DESCONTO} módulos${c.temVolume?' (aplicado nesta proposta)':''}.</li>
     ${d.p.condicao?`<li>Observação: ${esc(d.p.condicao)}</li>`:''}
   </ul>
@@ -1295,7 +1305,7 @@ function baixarArquivo(file){
 function mensagemEnvio(id,comAnexo){
   const d=dadosProposta(id);if(!d)return '';const c=condicoesProposta(d.p);
   const num=d.p.id.slice(0,8).toUpperCase();
-  return `Olá${d.p.contato?', '+d.p.contato:''}! ${comAnexo?'Segue em anexo (PDF)':'Segue'} a proposta comercial nº ${num} do ${d.sistema?.nome||'sistema'} para ${d.p.cliente}, com ${d.modulos.length} módulo(s).\n\nOpção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)}${c.temVolume?'\n(já com 10% de desconto por volume)':''}\n\n✅ Para aceitar a proposta:\n${linkAceite(d.p)}`;
+  return `Olá${d.p.contato?', '+d.p.contato:''}! ${comAnexo?'Segue em anexo (PDF)':'Segue'} a proposta comercial nº ${num} do ${d.sistema?.nome||'sistema'} para ${d.p.cliente}, com ${d.modulos.length} módulo(s).\n\n${(()=>{const op=opcoesPagamento(d.p);return op.ambas?`Opção 1: 12 parcelas de ${fmt(c.parcela)}\nOpção 2: à vista por ${fmt(c.total)}`:op.parcelado?`Pagamento: 12 parcelas de ${fmt(c.parcela)}`:`Pagamento à vista: ${fmt(c.total)}`;})()}${c.temVolume?'\n(já com 10% de desconto por volume)':''}\n\n✅ Para aceitar a proposta:\n${linkAceite(d.p)}`;
 }
 
 // ===== Janela de envio (WhatsApp / e-mail) =====
@@ -1431,8 +1441,8 @@ function atualizarTudo(){
   }
   atualizarPreviewMassa();
 
-  histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>À vista</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
-    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);return `12 × ${fmt(c.parcela)}<br><small>ou à vista com 10%</small>${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${fmt(p.total)}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+  histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>Valor total</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
+    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);const op=opcoesPagamento(p);return `${op.parcelado?`12 × ${fmt(c.parcela)}`:`À vista ${fmt(c.total)}`}${op.ambas?'<br><small>ou à vista com 10%</small>':op.parcelado?'<br><small>somente parcelado</small>':'<br><small>somente à vista (10% off)</small>'}${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${fmt(opcoesPagamento(p).avista?p.total:(p.subtotal??p.total))}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
   }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
 
   dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
