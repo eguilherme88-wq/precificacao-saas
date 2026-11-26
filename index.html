@@ -7,6 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Sistema de Precificação de Softwares e Módulos</title>
+<meta name="application-name" content="Partner Precificação SaaS">
+<meta name="apple-mobile-web-app-title" content="Precificação">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--primary:#155eef;--primary2:#0f4dcc;--dark:#172033;--muted:#667085;--line:#e4e7ec;--ok:#079455;--warn:#dc6803;--sidebar:#102a56}
 *{box-sizing:border-box}
@@ -458,6 +464,18 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
       </div>
       <div class="actions"><button class="primary" onclick="alterarSenha()">🔑 Alterar Senha</button><button class="secondary" onclick="salvarEmailAdmin()">💾 Salvar E-mail</button></div>
       <p class="muted">⚠️ A nova senha será enviada por e-mail ao administrador cadastrado acima.</p>
+    </div>
+    <div class="card form-card" id="cardApp">
+      <h2 class="title">📲 Aplicativo e Backup</h2>
+      <p class="muted" id="appStatus">Instale o sistema como aplicativo no computador, celular ou tablet. Ele abre em janela própria, com ícone, e funciona offline.</p>
+      <div class="actions">
+        <button class="primary" id="btnInstalarApp" onclick="instalarApp()" hidden>⬇️ Instalar aplicativo</button>
+        <button class="secondary" onclick="exportarBackup()">💾 Exportar backup</button>
+        <button class="secondary" onclick="document.getElementById('arqBackup').click()">📂 Importar backup</button>
+        <input type="file" id="arqBackup" accept="application/json,.json" hidden onchange="importarBackup(this)">
+      </div>
+      <p class="muted" id="appDica"></p>
+      <p class="muted">⚠️ Os dados ficam salvos no próprio aparelho/navegador. Para levar seus cadastros do navegador para o aplicativo (ou para outro aparelho), use Exportar e depois Importar backup.</p>
     </div>
   </section>
 </div>
@@ -1438,5 +1456,48 @@ if(sessionStorage.getItem('precificacao_logado')==='1')loginOverlay.style.displa
     <small class="muted envio-dica" id="envioDica"></small>
   </div>
 </div>
+<script>
+/* ===== Aplicativo instalável (PWA) + backup ===== */
+(function(){
+  const ehDesktop=/Electron/i.test(navigator.userAgent);
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const btn=document.getElementById('btnInstalarApp'),dica=document.getElementById('appDica'),status=document.getElementById('appStatus');
+  let promptInstalar=null;
+  if('serviceWorker' in navigator&&location.protocol==='https:'){
+    navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(e=>console.warn('SW:',e));
+  }
+  if(ehDesktop||standalone){status.textContent='✅ Você está usando o aplicativo instalado.';}
+  else if(ios){dica.innerHTML='No iPhone/iPad: abra no <b>Safari</b>, toque em <b>Compartilhar</b> (□↑) e depois em <b>Adicionar à Tela de Início</b>.';}
+  else{dica.textContent='Se o botão não aparecer, use o menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial".';}
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstalar=e;btn.hidden=false;});
+  window.addEventListener('appinstalled',()=>{btn.hidden=true;promptInstalar=null;status.textContent='✅ Aplicativo instalado! Procure por "Precificação" no menu de aplicativos.';});
+  window.instalarApp=async function(){if(!promptInstalar)return;promptInstalar.prompt();await promptInstalar.userChoice;promptInstalar=null;btn.hidden=true;};
+  const sec=location.hash.slice(1);
+  if(sec&&document.getElementById(sec)&&document.getElementById(sec).classList.contains('section'))try{abrir(sec);}catch(e){}
+})();
+function exportarBackup(){
+  const dados={app:'precificacao-saas',versao:1,geradoEm:new Date().toISOString(),dados:JSON.parse(localStorage.getItem(KEY_P)||'null'),tema:localStorage.getItem('precificacao_tema')};
+  const blob=new Blob([JSON.stringify(dados,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='backup-precificacao-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function importarBackup(input){
+  const arq=input.files&&input.files[0];input.value='';if(!arq)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const b=JSON.parse(r.result);
+      if(b.app!=='precificacao-saas'||!b.dados||typeof b.dados!=='object')throw new Error('Arquivo não é um backup deste sistema.');
+      if(!confirm('Importar este backup vai SUBSTITUIR os dados atuais deste aparelho. Continuar?'))return;
+      localStorage.setItem(KEY_P,JSON.stringify(b.dados));
+      if(b.tema)localStorage.setItem('precificacao_tema',b.tema);
+      alert('Backup importado com sucesso. O sistema será recarregado.');location.reload();
+    }catch(e){alert('Não foi possível importar: '+e.message);}
+  };
+  r.readAsText(arq);
+}
+</script>
 </body>
 </html>

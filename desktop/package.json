@@ -1,0 +1,96 @@
+{
+  "name": "precificacao-saas",
+  "productName": "Partner Precificacao SaaS",
+  "version": "1.0.0",
+  "description": "Sistema de Precificação de Softwares e Módulos (SaaS)",
+  "author": {
+    "name": "Partner Precificação SaaS",
+    "email": "eguilherme88-wq@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/eguilherme88-wq/precificacao-saas",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "copiar-app": "node copiar-app.js",
+    "start": "npm run copiar-app && electron .",
+    "dist:win": "npm run copiar-app && electron-builder --win --x64 --publish never",
+    "dist:linux": "npm run copiar-app && electron-builder --linux --x64 --publish never",
+    "dist": "npm run copiar-app && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "br.com.partner.precificacaosaas",
+    "productName": "Partner Precificacao SaaS",
+    "executableName": "partner-precificacao-saas",
+    "artifactName": "Precificacao-SaaS-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "guid": "6f3c2a1e-8b7d-4e52-9a41-3c5d7e9f1b20",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Partner Precificação SaaS",
+      "uninstallDisplayName": "Partner Precificação SaaS",
+      "deleteAppDataOnUninstall": false,
+      "language": "1046",
+      "installerLanguages": [
+        "pt_BR"
+      ]
+    },
+    "portable": {
+      "artifactName": "Precificacao-SaaS-${version}-portable.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png",
+      "maintainer": "Partner Precificação SaaS <eguilherme88-wq@users.noreply.github.com>",
+      "synopsis": "Precificação de softwares e módulos",
+      "desktop": {
+        "Name": "Partner Precificação SaaS",
+        "StartupWMClass": "partner-precificacao-saas"
+      }
+    },
+    "deb": {
+      "packageName": "partner-precificacao-saas"
+    },
+    "publish": null
+  }
+}
