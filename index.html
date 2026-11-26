@@ -241,6 +241,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
   <button class="menu-btn" aria-label="Abrir menu" onclick="alternarMenu()">☰</button>
   <div class="header-text"><h1>Sistema de Precificação de Softwares</h1><p>Gerenciamento de custos por módulo, implantação e mensalidades (SaaS)</p></div>
   <div class="header-actions">
+    <button class="secondary nova-btn" id="btnInstalarTopo" onclick="instalarApp()" hidden title="Instalar como aplicativo" aria-label="Instalar aplicativo">⬇️<span> Instalar app</span></button>
     <button class="hdr-btn" id="btnTema" onclick="alternarTema()" aria-label="Ativar tema escuro" title="Tema escuro">🌙</button>
     <button class="hdr-btn" id="btnTelaCheia" onclick="alternarTelaCheia()" aria-label="Entrar em tela cheia" title="Tela cheia">⛶</button>
     <button class="secondary nova-btn" onclick="abrir('proposta',document.querySelector('.tab[onclick*=proposta]'))" aria-label="Nova proposta">＋<span> Nova proposta</span></button>
@@ -1470,9 +1471,10 @@ setTimeout(()=>loginUsuario.focus(),50);
   if(ehDesktop||standalone){status.textContent='✅ Você está usando o aplicativo instalado.';}
   else if(ios){dica.innerHTML='No iPhone/iPad: abra no <b>Safari</b>, toque em <b>Compartilhar</b> (□↑) e depois em <b>Adicionar à Tela de Início</b>.';}
   else{dica.textContent='Se o botão não aparecer, use o menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial".';}
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstalar=e;btn.hidden=false;});
-  window.addEventListener('appinstalled',()=>{btn.hidden=true;promptInstalar=null;status.textContent='✅ Aplicativo instalado! Procure por "Precificação" no menu de aplicativos.';});
-  window.instalarApp=async function(){if(!promptInstalar)return;promptInstalar.prompt();await promptInstalar.userChoice;promptInstalar=null;btn.hidden=true;};
+  const btnTopo=document.getElementById('btnInstalarTopo');
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstalar=e;btn.hidden=false;if(btnTopo)btnTopo.hidden=false;});
+  window.addEventListener('appinstalled',()=>{btn.hidden=true;if(btnTopo)btnTopo.hidden=true;promptInstalar=null;status.textContent='✅ Aplicativo instalado! Procure por "Precificação" no menu de aplicativos.';});
+  window.instalarApp=async function(){if(!promptInstalar){alert(ios?'No iPhone/iPad: Safari → Compartilhar → Adicionar à Tela de Início.':'Use o ícone de instalar na barra de endereço do navegador, ou o menu ⋮ → Transmitir, salvar e compartilhar → Instalar página como app.');return;}promptInstalar.prompt();await promptInstalar.userChoice;promptInstalar=null;btn.hidden=true;if(btnTopo)btnTopo.hidden=true;};
   const sec=location.hash.slice(1);
   if(sec&&document.getElementById(sec)&&document.getElementById(sec).classList.contains('section'))try{abrir(sec);}catch(e){}
 })();
