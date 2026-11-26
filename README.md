@@ -21,7 +21,7 @@ Sistema de Precificação de Softwares e Módulos (SaaS) — funciona no navegad
 
 ## Gerar os instaladores
 
-Automático (GitHub Actions): crie uma tag de versão — `git tag v1.0.0 && git push --tags` — ou use **Actions → Gerar instaladores → Run workflow**. Os arquivos aparecem em **Releases** (com tag) ou nos *artifacts* da execução.
+Automático (GitHub Actions): a cada envio para a branch `main` que altere o app, os instaladores são gerados e publicados em **Releases** com a versão de `desktop/package.json`. Também dá para rodar manualmente em **Actions → Gerar instaladores → Run workflow**.
 
 Manual (precisa de Node.js 20+):
 

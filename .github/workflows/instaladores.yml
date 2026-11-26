@@ -3,7 +3,9 @@ name: Gerar instaladores (Windows e Linux)
 on:
   workflow_dispatch:        # botão "Run workflow" na aba Actions
   push:
-    tags: ['v*']            # ex.: git tag v1.0.0 && git push --tags -> cria Release com os instaladores
+    branches: [main, instaladores-app]
+    tags: ['v*']
+    paths: ['index.html', 'manifest.webmanifest', 'sw.js', 'icons/**', 'desktop/**', '.github/workflows/instaladores.yml']
 
 permissions:
   contents: write
@@ -41,10 +43,14 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Publica na página Releases ao enviar para main (ou tag v*). Na branch de teste só gera os artifacts.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - id: versao
+        run: echo "tag=v$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           path: arquivos
@@ -52,7 +58,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: arquivos/*
-          name: Partner Precificação SaaS ${{ github.ref_name }}
+          tag_name: ${{ steps.versao.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Partner Precificação SaaS ${{ steps.versao.outputs.tag }}
           body: |
             **Windows:** baixe `Precificacao-SaaS-*-win-x64.exe` (instalador) ou `*-portable.exe` (sem instalar).
             **Linux:** `.deb` (Ubuntu/Debian/Mint) ou `.AppImage` (qualquer distribuição).
