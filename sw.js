@@ -6,7 +6,7 @@
  *  - só intercepta requisições dentro do próprio escopo.
  */
 const PREFIXO = 'precificacao-saas-';
-const VERSAO = 'v1';
+const VERSAO = 'v2';
 const CACHE = PREFIXO + VERSAO;
 const ESCOPO = self.registration.scope;
 const ARQUIVOS = [
@@ -33,7 +33,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || !req.url.startsWith(ESCOPO)) return; // fora do app: não mexe
+  const ehFirebaseSdk = req.url.startsWith('https://www.gstatic.com/firebasejs/');
+  if (req.method !== 'GET' || (!req.url.startsWith(ESCOPO) && !ehFirebaseSdk)) return; // fora do app: não mexe
 
   // Páginas: rede primeiro (sempre pega a versão nova), cache se estiver offline
   if (req.mode === 'navigate') {
