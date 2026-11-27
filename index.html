@@ -1440,8 +1440,9 @@ function renderEnvio(){
   else if(estado==='pronto'){envioStatus.className='envio-status ok';envioStatus.innerHTML=`📄 <span><b>${esc(file.name)}</b><br>PDF pronto (${Math.max(1,Math.round(file.size/1024))} KB)</span>`;}
   else{envioStatus.className='envio-status erro';envioStatus.innerHTML='⚠️ <span>Não foi possível gerar o PDF automaticamente. Verifique a conexão com a internet e tente de novo, ou use o botão <b>📄 PDF</b> do histórico para salvar o arquivo manualmente.</span>';}
   let b='';
-  if(share)b+=`<button class="primary" onclick="compartilharPdf()">📎 Enviar com o PDF anexado</button>`;
-  if(estado==='pronto'&&canal==='email')b+=`<button class="${share?'secondary':'primary'}" onclick="baixarEAbrir('gmail')">📧 Baixar PDF e abrir no Gmail</button>`;
+  if(share)b+=`<button class="${canal==='email'?'secondary':'primary'}" onclick="compartilharPdf()">📎 Enviar com o PDF anexado</button>`;
+  if(canal==='email'&&estado!=='gerando')b+=`<button class="primary" onclick="gmailSoLink()">🔗 Abrir no Gmail só com o link (sem anexo)</button>`;
+  if(estado==='pronto'&&canal==='email')b+=`<button class="secondary" onclick="baixarEAbrir('gmail')">📧 Baixar PDF e abrir no Gmail</button>`;
   if(estado==='pronto')b+=`<button class="secondary" onclick="baixarEAbrir()">⬇️ Baixar PDF e abrir o ${nomeCanal}</button><button class="secondary" onclick="baixarArquivo(envioAtual.file)">⬇️ Só baixar o PDF</button>`;
   if(estado==='erro')b+=`<button class="primary" onclick="abrirEnvio(envioAtual.id,envioAtual.canal)">↻ Tentar gerar o PDF novamente</button>`;
   b+=`<button class="secondary" onclick="enviarSoMensagem()">${canal==='whatsapp'?'💬':'✉️'} Enviar só a mensagem (sem anexo)</button>`;
@@ -1463,6 +1464,14 @@ function baixarEAbrir(via){
   if(canal==='whatsapp')window.open(`https://wa.me/${telefoneComPais(d.cliente?.telefone)}?text=${encodeURIComponent(msg)}`,'_blank');
   else if(via==='gmail')window.open(gmailUrl((d.cliente?.email||'').trim(),'Proposta Comercial - '+d.p.cliente,msg+'\n\n📎 Anexo: '+file.name),'_blank');
   else location.href=`mailto:${encodeURIComponent((d.cliente?.email||'').trim())}?subject=${encodeURIComponent('Proposta Comercial - '+d.p.cliente)}&body=${encodeURIComponent(msg+'\n\n📎 Anexo: '+file.name)}`;
+}
+// E-mail só com o link da proposta: o cliente vê, aceita e baixa o PDF pela própria página (sem mencionar anexo)
+function gmailSoLink(){
+  if(!envioAtual)return;const {id}=envioAtual;const d=dadosProposta(id);if(!d)return;
+  const email=(d.cliente?.email||'').trim(),link=linkAceite(d.p),temPagina=!!linkPublico(d.p);
+  const msg=mensagemEnvio(id,false).replace(/\n\n✅ Para aceitar a proposta:\n[^\n]*$/,'')
+    +(temPagina?`\n\n📄 Veja a proposta completa, baixe o PDF e aceite online pelo link:\n${link}`:`\n\n✅ Para aceitar a proposta:\n${link}`);
+  window.open(gmailUrl(email,'Proposta Comercial - '+d.p.cliente,msg),'_blank');fecharEnvio();
 }
 function enviarSoMensagem(){if(!envioAtual)return;const {id,canal}=envioAtual;fecharEnvio();canal==='whatsapp'?enviarWhatsApp(id):enviarEmail(id);}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!envioOverlay.hidden)fecharEnvio();});
