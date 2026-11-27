@@ -6,7 +6,7 @@
  *  - só intercepta requisições dentro do próprio escopo.
  */
 const PREFIXO = 'precificacao-saas-';
-const VERSAO = 'v12';
+const VERSAO = 'v13';
 const CACHE = PREFIXO + VERSAO;
 const ESCOPO = self.registration.scope;
 const ARQUIVOS = [
