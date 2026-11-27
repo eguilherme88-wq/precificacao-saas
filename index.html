@@ -1027,6 +1027,7 @@ function salvarProposta(){
       const {id,status,...novosDados}=proposta;
       Object.assign(existente,novosDados,{editadaEm:new Date().toISOString()});
       persist();
+      if(existente.linkPublicado)prepararLinkPublico(existente.id);
       alert(`Proposta nº ${existente.id.slice(0,8).toUpperCase()} atualizada com sucesso!`);
       limparPropostaForm();
       abrir('historico',document.querySelector(`.tab[onclick*="'historico'"]`));
@@ -1050,6 +1051,7 @@ function atualizarModoEdicaoProposta(){
 }
 function editarProposta(id){
   const p=db.propostas.find(x=>x.id===id);if(!p)return;
+  if(p.aceite)return alert(`Esta proposta já foi aceita pelo cliente em ${dataHoraBR(p.aceite.dataHora)} (${p.aceite.email}).\n\nPara não alterar o que foi aceito, ela não pode ser editada. Monte uma nova proposta se precisar mudar algo.`);
   editandoPropostaId=id;
   abrir('proposta',document.querySelector(`.tab[onclick*="'proposta'"]`));
   pCliente.value=db.clientes.some(c=>c.id===p.clienteId)?p.clienteId:'';
@@ -1089,7 +1091,7 @@ function limparPropostaForm(){
 }
 
 function excluirProposta(id){
-  if(confirm('Excluir esta proposta?')){db.propostas=db.propostas.filter(x=>x.id!==id);if(editandoPropostaId===id)limparPropostaForm();persist()}
+  if(confirm('Excluir esta proposta?')){const ex=db.propostas.find(x=>x.id===id);if(ex&&ex.linkToken&&window.excluirPropostaNuvem)window.excluirPropostaNuvem(ex.linkToken).catch(e=>console.warn(e));db.propostas=db.propostas.filter(x=>x.id!==id);if(editandoPropostaId===id)limparPropostaForm();persist()}
 }
 function alterarStatusProposta(id,status){const p=db.propostas.find(x=>x.id===id);if(!p)return;p.status=status;p.dataStatus=new Date().toISOString();persist();}
 
@@ -1105,7 +1107,20 @@ function textoProposta(id){
   return `PROPOSTA COMERCIAL Nº ${d.p.id.slice(0,8).toUpperCase()}\n\nCliente: ${d.p.cliente}\nSistema: ${d.sistema?.nome||'Módulos independentes'}\n\nMódulos (${d.modulos.length}):\n${lista}\n\n${mostra12(d.p)?`Valor de 12 meses: ${fmt(c.bruto)}${c.temVolume?`\nDesconto por volume (10%): -${fmt(c.descontoVolume)}\nValor do contrato: ${fmt(c.subtotal)}`:''}`:`Valor mensal: ${fmt(c.parcela)}${c.temVolume?' (com 10% de desconto por volume)':''}`}\n\n${(()=>{const op=opcoesPagamento(d.p);const pc=mostra12(d.p)?`12 parcelas de ${fmt(c.parcela)}`:`mensalidade de ${fmt(c.parcela)}`;return op.ambas?`Opção 1: ${pc}\nOpção 2: à vista por ${fmt(c.total)} (10% de desconto à vista)`:op.parcelado?`Pagamento: ${pc}`:`Pagamento: à vista por ${fmt(c.total)} (10% de desconto à vista)`;})()}\nMeio de pagamento: ${d.p.meioPagamento||'-'}${d.p.condicao?'\nObservação: '+d.p.condicao:''}\n\nA descrição completa de cada módulo está na proposta em PDF.`;
 }
 function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return n;}
+const URL_PROPOSTA_PUBLICA='https://eguilherme88-wq.github.io/precificacao-saas/proposta.html';
+function linkPublico(p){return p&&p.linkToken&&p.linkPublicado?`${URL_PROPOSTA_PUBLICA}?p=${p.linkToken}`:'';}
+function dataHoraBR(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})+' às '+d.toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo'});}
+async function prepararLinkPublico(id){
+  const p=db.propostas.find(x=>x.id===id);if(!p)return '';
+  if(p.aceite)return linkPublico(p);
+  if(typeof window.publicarPropostaNuvem!=='function')return linkPublico(p);
+  if(!p.linkToken){p.linkToken=crypto.randomUUID();persist();}
+  try{await window.publicarPropostaNuvem(p,htmlProposta(id,'link'));if(!p.linkPublicado){p.linkPublicado=true;persist();}}
+  catch(e){console.error('Publicar proposta:',e);}
+  return linkPublico(p);
+}
 function linkAceite(p){
+  const pub=linkPublico(p);if(pub)return pub;
   const msg=`ACEITO A PROPOSTA ${p.id.slice(0,8).toUpperCase()} - Cliente: ${p.cliente}`;
   const whats=telefoneComPais(p.whatsAceite);if(whats)return `https://wa.me/${whats}?text=${encodeURIComponent(msg)}`;
   if(p.emailAceite)return `mailto:${encodeURIComponent(p.emailAceite)}?subject=${encodeURIComponent('Aceite da proposta - '+p.cliente)}&body=${encodeURIComponent(msg)}`;
@@ -1116,7 +1131,7 @@ function corpoEmailHtml(id){
   const c=condicoesProposta(d.p);
   const hE=d.p.hospedagem;
   const itens=d.modulos.map(m=>`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>${esc(m.nome)}</b>${(m.desc||'').trim()?`<div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px;white-space:pre-line">${esc(m.desc.trim())}</div>`:''}</td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${ehGratuito(m)?'Gratuito':fmt(m.anual)+'/mês'}</td></tr>`).join('');
-  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, ${mostra12(d.p)?`o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>`:`o valor mensal de ${fmt(c.mensal)} recebe 10% de desconto, ficando em <b>${fmt(c.parcela)}/mês</b>`}.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">${opcoesPagamento(d.p).ambas?'Opções comerciais':'Condição de pagamento'}</h2><table style="width:100%;border-spacing:10px 0"><tr>${opcoesPagamento(d.p).parcelado?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">${mostra12(d.p)?'PARCELADO':'MENSALIDADE'}</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${mostra12(d.p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`}</div><div style="color:#667085;font-size:13px">${mostra12(d.p)?`Total: ${fmt(c.subtotal)}`:'Pagamento mensal'}</div></td>`:''}${opcoesPagamento(d.p).avista?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td>`:''}</tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">✓ Aceitar proposta</a><p style="color:#667085;font-size:12px;margin-top:10px">Ao clicar, será aberta uma mensagem de confirmação do aceite.</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
+  return `<div style="background:#f4f7fb;padding:24px;font-family:Arial,sans-serif;color:#172033"><div style="max-width:680px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e7ec"><div style="background:linear-gradient(135deg,#102a56,#155eef);padding:30px;color:#ffffff"><div style="font-size:13px;opacity:.85">PROPOSTA COMERCIAL</div><h1 style="margin:8px 0 6px;font-size:28px">Solução de software para ${esc(d.p.cliente)}</h1><div style="opacity:.85">Proposta nº ${esc(d.p.id.slice(0,8).toUpperCase())} • ${esc(dataBR(d.p.data))}</div></div><div style="padding:28px"><p style="font-size:16px;line-height:1.6">Olá, <b>${esc(d.p.contato||d.p.cliente)}</b>. Preparamos esta proposta para a contratação do <b>${esc(d.sistema?.nome||'sistema selecionado')}</b>.</p><h2 style="color:#155eef;font-size:19px;margin-top:28px">Módulos incluídos</h2><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:10px">${itens}${hE&&hE.adicionais?`<tr><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;color:#172033;vertical-align:top"><b>Adicional de hospedagem</b><div style="color:#475467;font-size:13px;line-height:1.5;margin-top:4px">${esc(textoHospedagem(hE))}</div></td><td style="padding:12px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#172033;vertical-align:top;white-space:nowrap">${fmt(hE.valor)}/mês</td></tr>`:''}</table>${c.temVolume?`<div style="margin-top:14px;background:#ecfdf3;border:1px solid #abefc6;color:#027a48;padding:12px 14px;border-radius:10px;font-size:14px"><b>Desconto por volume:</b> por contratar ${c.qtd} módulos, ${mostra12(d.p)?`o valor anual de ${fmt(c.bruto)} recebe 10% de desconto (-${fmt(c.descontoVolume)}), ficando em <b>${fmt(c.subtotal)}</b>`:`o valor mensal de ${fmt(c.mensal)} recebe 10% de desconto, ficando em <b>${fmt(c.parcela)}/mês</b>`}.</div>`:''}<h2 style="color:#155eef;font-size:19px;margin-top:28px">${opcoesPagamento(d.p).ambas?'Opções comerciais':'Condição de pagamento'}</h2><table style="width:100%;border-spacing:10px 0"><tr>${opcoesPagamento(d.p).parcelado?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #155eef;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#155eef;font-weight:bold">${mostra12(d.p)?'PARCELADO':'MENSALIDADE'}</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${mostra12(d.p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`}</div><div style="color:#667085;font-size:13px">${mostra12(d.p)?`Total: ${fmt(c.subtotal)}`:'Pagamento mensal'}</div></td>`:''}${opcoesPagamento(d.p).avista?`<td style="width:${opcoesPagamento(d.p).ambas?'50%':'100%'};padding:18px;border:2px solid #079455;border-radius:10px;vertical-align:top"><div style="font-size:12px;color:#079455;font-weight:bold">À VISTA • 10% OFF</div><div style="font-size:21px;font-weight:bold;margin:8px 0">${fmt(c.total)}</div><div style="color:#667085;font-size:13px">Economia de ${fmt(c.desconto+c.descontoVolume)}</div></td>`:''}</tr></table><p style="margin:24px 0;color:#475467"><b>Meio de pagamento:</b> ${esc(d.p.meioPagamento||'-')}</p><div style="text-align:center;margin:32px 0"><a href="${esc(linkAceite(d.p))}" style="display:inline-block;background:#079455;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:9px;font-weight:bold;font-size:16px">${linkPublico(d.p)?'Ver proposta e aceitar':'✓ Aceitar proposta'}</a><p style="color:#667085;font-size:12px;margin-top:10px">${linkPublico(d.p)?'Ao clicar, a proposta abre no navegador com o botão de aceite.':'Ao clicar, será aberta uma mensagem de confirmação do aceite.'}</p></div>${d.p.condicao?`<div style="background:#fffaeb;padding:12px;border-radius:8px"><b>Observação:</b> ${esc(d.p.condicao)}</div>`:''}</div><div style="background:#f8fafc;padding:18px 28px;color:#667085;font-size:12px;text-align:center">Esta proposta contém as condições comerciais apresentadas no sistema.</div></div></div>`;
 }
 function dataBR(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||'');}
 function htmlProposta(id,modo='imprimir'){
@@ -1195,6 +1210,8 @@ table{width:100%;border-collapse:collapse}
 .cond li:before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:2px;background:#155eef}
 .aceite{break-inside:avoid}
 .aceite p{color:#475467;margin:0 0 30px}
+.aceite-eletronico{margin:0 0 22px;background:#ecfdf3;border:1.5px solid #079455;border-radius:10px;padding:12px 14px;font-size:9.5pt;color:#054f31;line-height:1.6;break-inside:avoid}
+.aceite-eletronico b{color:#054f31}
 .assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:10px}
 .assin div{border-top:1px solid #344054;padding-top:6px;font-size:9pt;color:#475467}
 .assin b{display:block;color:#1d2939;font-size:10pt}
@@ -1260,6 +1277,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
   <section class="aceite">
     <h2><span>04</span>Aceite</h2>
     <p>Declaro estar de acordo com o escopo e as condições comerciais descritas nesta proposta.</p>
+    ${d.p.aceite?`<div class="aceite-eletronico">✅ <b>Aceite eletrônico registrado</b><br>Data e hora: <b>${esc(dataHoraBR(d.p.aceite.dataHora))}</b> (horário de Brasília)<br>Aceito por: <b>${esc(d.p.aceite.nome||'')}</b> · ${esc(d.p.aceite.email||'')}<br><span style="font-size:8pt;color:#067647">Registro do aceite: ${esc(d.p.linkToken||'')}</span></div>`:''}
     <div class="assin"><div><b>${esc(d.p.cliente)}</b>${d.p.contato?esc(d.p.contato)+' · ':''}Contratante</div><div><b>&nbsp;</b>Contratada</div></div>
     <div class="local">Local e data: ______________________________, ____ / ____ / ________</div>
   </section>
@@ -1325,6 +1343,7 @@ async function abrirEnvio(id,canal){
   envioTitulo.textContent=canal==='whatsapp'?'💬 Enviar proposta pelo WhatsApp':'✉️ Enviar proposta por e-mail';
   envioSub.textContent=`${d.p.cliente} · ${canal==='whatsapp'?(d.cliente?.telefone||''):email} · Proposta nº ${d.p.id.slice(0,8).toUpperCase()}`;
   envioOverlay.hidden=false;renderEnvio();
+  await prepararLinkPublico(id);
   try{const f=await gerarArquivoPdf(id);if(!envioAtual||envioAtual.id!==id)return;envioAtual.file=f;envioAtual.estado='pronto';}
   catch(e){console.error(e);if(!envioAtual||envioAtual.id!==id)return;envioAtual.estado='erro';}
   renderEnvio();
@@ -1366,13 +1385,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!envioOverlay.hidde
 function enviarWhatsApp(id){
   const d=dadosProposta(id);if(!d)return;let telefone=(d.cliente?.telefone||'').replace(/\D/g,'');
   if(!telefone)return alert('Cadastre o telefone do cliente antes de enviar pelo WhatsApp.');if(telefone.length<=11)telefone='55'+telefone;
-  const aceite=linkAceite(d.p);const msg=`${textoProposta(id)}\n\n✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`;
+  const aceite=linkAceite(d.p);const msg=`${textoProposta(id)}\n\n${linkPublico(d.p)?`📄 Ver a proposta completa e aceitar online:\n${aceite}`:`✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`}`;
   window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 function enviarEmail(id){
   const d=dadosProposta(id);if(!d)return;const email=(d.cliente?.email||'').trim();if(!email)return alert('Cadastre o e-mail do cliente antes do envio.');
   const assunto='Proposta Comercial - '+d.p.cliente;const aceite=linkAceite(d.p);
-  const corpoTexto=`${textoProposta(id)}\n\n✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`;
+  const corpoTexto=`${textoProposta(id)}\n\n${linkPublico(d.p)?`📄 Ver a proposta completa e aceitar online:\n${aceite}`:`✅ ACEITAR PROPOSTA:\n${aceite}\n\nAo abrir o link, confirme o aceite na mensagem preparada.`}`;
   const mailtoHref=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoTexto)}`;
   const preview=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Prévia da Proposta - ${esc(d.p.cliente)}</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#e9edf3}
@@ -1448,7 +1467,7 @@ function atualizarTudo(){
   atualizarPreviewMassa();
 
   histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>Valor total</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
-    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small></td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);const op=opcoesPagamento(p);return `${op.parcelado?(mostra12(p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`):`À vista ${fmt(c.total)}`}${op.ambas?'<br><small>ou à vista com 10%</small>':op.parcelado?'<br><small>somente parcelado</small>':'<br><small>somente à vista (10% off)</small>'}${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${opcoesPagamento(p).avista?fmt(p.total):(mostra12(p)?fmt(p.subtotal??p.total):fmt(p.parcela)+'/mês')}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small>${p.aceite?`<br><span class="badge ok" title="${esc(p.aceite.nome)} · ${esc(p.aceite.email)}">✅ Aceita online ${esc(dataHoraBR(p.aceite.dataHora))}</span>`:(p.linkPublicado?'<br><small class="muted">🔗 link enviado</small>':'')}</td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);const op=opcoesPagamento(p);return `${op.parcelado?(mostra12(p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`):`À vista ${fmt(c.total)}`}${op.ambas?'<br><small>ou à vista com 10%</small>':op.parcelado?'<br><small>somente parcelado</small>':'<br><small>somente à vista (10% off)</small>'}${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${opcoesPagamento(p).avista?fmt(p.total):(mostra12(p)?fmt(p.subtotal??p.total):fmt(p.parcela)+'/mês')}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
   }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
 
   dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
@@ -1521,7 +1540,7 @@ function importarBackup(input){
 /* ===== Firebase: login por e-mail e dados na nuvem ===== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp, collection, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const app = initializeApp({
   apiKey: 'AIzaSyCNNNbRFphMFg9yyRKPBJFSlUbw-vI80F8',
@@ -1537,6 +1556,7 @@ const fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabMana
 
 const statusEl = () => document.getElementById('statusNuvem');
 const setStatus = t => { const e = statusEl(); if (e) e.textContent = t; };
+let pararAceites = null;
 let docRef = null, pararEscuta = null, aplicandoRemoto = false, timerSalvar = null, ultimoJson = null;
 
 // Toda gravação local dos dados também agenda o envio para a nuvem
@@ -1587,7 +1607,31 @@ async function conectarDados(user) {
     const j = s.data().json;
     if (j && j !== ultimoJson && j !== JSON.stringify(db)) aplicarDados(j);
   }, e => console.warn('Escuta:', e));
+  // Aceites feitos pelos clientes no link público
+  if (pararAceites) pararAceites();
+  pararAceites = onSnapshot(query(collection(fs, 'propostasPublicas'), where('ownerUid', '==', user.uid)), snap => {
+    let mudou = false;
+    snap.forEach(ds => {
+      const a = ds.data().aceite; if (!a || !a.dataHora) return;
+      const p = db.propostas.find(x => x.linkToken === ds.id); if (!p) return;
+      const iso = a.dataHora.toDate().toISOString();
+      if (!p.aceite || p.aceite.dataHora !== iso) {
+        p.aceite = { nome: a.nome || '', email: a.email || '', dataHora: iso, navegador: a.navegador || '' };
+        p.status = 'Aceita'; p.dataStatus = iso; mudou = true;
+      }
+    });
+    if (mudou) persist();
+  }, e => console.warn('Aceites:', e));
 }
+window.publicarPropostaNuvem = async function (p, html) {
+  const user = fbAuth.currentUser; if (!user) throw new Error('Entre no sistema para gerar o link.');
+  const ref = doc(fs, 'propostasPublicas', p.linkToken);
+  let atual = null; try { const s = await getDoc(ref); atual = s.exists() ? s.data() : null; } catch (e) {}
+  if (atual && atual.aceite) return;
+  const cli = db.clientes.find(c => c.id === p.clienteId) || {};
+  await setDoc(ref, { ownerUid: user.uid, numero: p.id.slice(0, 8).toUpperCase(), cliente: p.cliente || '', emailCliente: (cli.email || p.emailAceite || '').trim(), html, atualizadoEm: serverTimestamp() });
+};
+window.excluirPropostaNuvem = async function (token) { if (fbAuth.currentUser) await deleteDoc(doc(fs, 'propostasPublicas', token)); };
 
 onAuthStateChanged(fbAuth, user => {
   if (user) {
@@ -1596,7 +1640,7 @@ onAuthStateChanged(fbAuth, user => {
     if (!secEmailAdmin.value) secEmailAdmin.value = user.email;
     conectarDados(user);
   } else {
-    if (pararEscuta) pararEscuta(); pararEscuta = null; docRef = null; ultimoJson = null;
+    if (pararEscuta) pararEscuta(); pararEscuta = null; if (pararAceites) pararAceites(); pararAceites = null; docRef = null; ultimoJson = null;
     loginOverlay.style.display = 'flex';
   }
 });

@@ -1,9 +1,1 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Cada usuário só lê e grava os próprios dados
-    match /precificacao/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-  }
-}
+rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /precificacao/{uid} { allow read, write: if request.auth != null && request.auth.uid == uid; } match /propostasPublicas/{token} { allow get: if true; allow list: if request.auth != null && resource.data.ownerUid == request.auth.uid; allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid && !('aceite' in request.resource.data); allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid; allow update: if (request.auth != null && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.get('aceite', null) == resource.data.get('aceite', null)) || (!('aceite' in resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['aceite']) && request.resource.data.aceite.keys().hasOnly(['nome', 'email', 'dataHora', 'navegador']) && request.resource.data.aceite.dataHora == request.time && request.resource.data.aceite.nome is string && request.resource.data.aceite.nome.size() > 2 && request.resource.data.aceite.nome.size() < 150 && request.resource.data.aceite.email is string && request.resource.data.aceite.email.size() < 200 && request.resource.data.aceite.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$') && (!('navegador' in request.resource.data.aceite) || request.resource.data.aceite.navegador.size() < 300)); } } }

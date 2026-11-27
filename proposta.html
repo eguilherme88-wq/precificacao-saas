@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#102a56">
+<title>Proposta comercial</title>
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:#e9edf3;color:#172033}
+.topo{position:sticky;top:0;z-index:5;background:#102a56;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 10px #0003}
+.topo b{font-size:15px}.topo small{opacity:.8}
+.btn{border:0;border-radius:10px;padding:12px 18px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}
+.btn-aceitar{background:#079455;color:#fff}.btn-aceitar:hover{background:#067647}
+.btn-sec{background:#fff;color:#102a56}
+.btn:disabled{opacity:.6;cursor:wait}
+.doc{max-width:980px;margin:18px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 6px 24px #10182818}
+iframe{display:block;width:100%;border:0;min-height:600px}
+.painel{max-width:980px;margin:0 auto 40px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 6px 24px #10182818;border-top:5px solid #079455}
+.painel h2{margin:0 0 6px;color:#102a56;font-size:20px}.painel p{margin:6px 0;color:#475467;line-height:1.5}
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+label{font-size:13px;font-weight:700;display:block;margin-bottom:5px}
+input[type=text],input[type=email]{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:8px;font:inherit;font-size:15px}
+.concordo{display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-size:14px;color:#344054;cursor:pointer}
+.concordo input{width:20px;height:20px;margin-top:1px;accent-color:#079455;flex:none}
+.erro{color:#b42318;font-size:14px;min-height:18px;margin-top:8px}
+.ok{background:#ecfdf3;border:1px solid #abefc6;color:#067647;border-radius:10px;padding:16px;font-size:15px;line-height:1.6}
+.ok b{color:#054f31}
+.centro{text-align:center;padding:60px 20px;color:#475467}
+@media(max-width:640px){.campos{grid-template-columns:1fr}.doc{margin:0;border-radius:0}.painel{border-radius:0}}
+@media print{.topo,.painel,.naoimprime{display:none}body{background:#fff}.doc{margin:0;box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="topo"><div><b id="tTitulo">Proposta comercial</b><br><small id="tSub">Carregando…</small></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sec naoimprime" onclick="imprimir()">🖨️ Imprimir / PDF</button><button class="btn btn-aceitar naoimprime" id="btnIrAceite" onclick="document.getElementById('painel').scrollIntoView({behavior:'smooth'})" hidden>✅ Aceitar proposta</button></div>
+</div>
+<div id="conteudo"><div class="centro">Carregando a proposta…</div></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, doc, getDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const app = initializeApp({
+  apiKey: 'AIzaSyCNNNbRFphMFg9yyRKPBJFSlUbw-vI80F8',
+  authDomain: 'sistema-precificacao-b5349.firebaseapp.com',
+  projectId: 'sistema-precificacao-b5349',
+  storageBucket: 'sistema-precificacao-b5349.firebasestorage.app',
+  messagingSenderId: '678500257773',
+  appId: '1:678500257773:web:ed385e3087a3f4e82761e4'
+});
+const fs = getFirestore(app);
+const token = new URLSearchParams(location.search).get('p') || '';
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dataHora = ts => { const d = ts?.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) + ' às ' + d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) + ' (horário de Brasília)'; };
+let ref = null, dados = null;
+
+function erroTela(msg) { $('conteudo').innerHTML = `<div class="centro"><h2>Proposta indisponível</h2><p>${esc(msg)}</p></div>`; $('tSub').textContent = ''; }
+
+function painelAceito(a) {
+  return `<div class="ok">✅ <b>Proposta aceita.</b><br>Data e hora do aceite: <b>${esc(dataHora(a.dataHora))}</b><br>Aceita por: <b>${esc(a.nome)}</b> (${esc(a.email)})</div>`;
+}
+
+async function carregar() {
+  if (!/^[0-9a-f-]{30,}$/i.test(token)) return erroTela('O link está incompleto. Confira se copiou o endereço inteiro.');
+  ref = doc(fs, 'propostasPublicas', token);
+  let snap;
+  try { snap = await getDoc(ref); } catch (e) { console.error(e); return erroTela('Não foi possível carregar a proposta. Verifique sua conexão e tente novamente.'); }
+  if (!snap.exists()) return erroTela('Esta proposta não existe ou foi retirada pelo fornecedor.');
+  dados = snap.data();
+  document.title = `Proposta ${dados.numero || ''} - ${dados.cliente || ''}`;
+  $('tTitulo').textContent = `Proposta comercial nº ${dados.numero || ''}`;
+  $('tSub').textContent = dados.cliente || '';
+  $('conteudo').innerHTML = `<div class="doc"><iframe id="quadro" sandbox="allow-same-origin allow-modals" title="Proposta"></iframe></div><div class="painel" id="painel"></div>`;
+  const quadro = $('quadro');
+  quadro.addEventListener('load', () => { try { quadro.style.height = quadro.contentDocument.documentElement.scrollHeight + 20 + 'px'; } catch (e) { quadro.style.height = '2400px'; } });
+  quadro.srcdoc = dados.html || '<p>Sem conteúdo.</p>';
+  renderPainel();
+}
+
+function renderPainel() {
+  const p = $('painel');
+  if (dados.aceite && dados.aceite.dataHora) { p.innerHTML = `<h2>Aceite registrado</h2>${painelAceito(dados.aceite)}`; $('btnIrAceite').hidden = true; return; }
+  $('btnIrAceite').hidden = false;
+  p.innerHTML = `<h2>Aceite da proposta</h2>
+    <p>Para aceitar esta proposta, informe seu nome e e-mail e confirme abaixo. A data e a hora do aceite serão registradas.</p>
+    <div class="campos"><div><label for="aNome">Nome completo</label><input type="text" id="aNome" autocomplete="name" maxlength="140"></div>
+    <div><label for="aEmail">E-mail</label><input type="email" id="aEmail" autocomplete="email" maxlength="190" value="${esc(dados.emailCliente || '')}"></div></div>
+    <label class="concordo"><input type="checkbox" id="aConcordo"> Li e estou de acordo com o escopo, os valores e as condições comerciais desta proposta.</label>
+    <button class="btn btn-aceitar" id="btnAceitar">✅ Aceitar proposta</button><div class="erro" id="aErro"></div>`;
+  $('btnAceitar').onclick = aceitar;
+}
+
+async function aceitar() {
+  const nome = $('aNome').value.trim(), email = $('aEmail').value.trim(), erro = $('aErro');
+  erro.textContent = '';
+  if (nome.length < 3) return erro.textContent = 'Informe seu nome completo.';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return erro.textContent = 'Informe um e-mail válido.';
+  if (!$('aConcordo').checked) return erro.textContent = 'Marque a confirmação de que está de acordo.';
+  const b = $('btnAceitar'); b.disabled = true; b.textContent = 'Registrando aceite…';
+  try {
+    await updateDoc(ref, { aceite: { nome, email, dataHora: serverTimestamp(), navegador: navigator.userAgent.slice(0, 250) } });
+    const snap = await getDoc(ref); dados = snap.data(); renderPainel();
+    $('painel').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    console.error(e);
+    try { const snap = await getDoc(ref); if (snap.data()?.aceite) { dados = snap.data(); return renderPainel(); } } catch (_) {}
+    b.disabled = false; b.textContent = '✅ Aceitar proposta';
+    erro.textContent = 'Não foi possível registrar o aceite. Verifique sua conexão e tente novamente.';
+  }
+}
+window.imprimir = () => { const q = $('quadro'); if (q && q.contentWindow) { try { q.contentWindow.print(); return; } catch (e) {} } window.print(); };
+carregar();
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@
  *  - só intercepta requisições dentro do próprio escopo.
  */
 const PREFIXO = 'precificacao-saas-';
-const VERSAO = 'v9';
+const VERSAO = 'v10';
 const CACHE = PREFIXO + VERSAO;
 const ESCOPO = self.registration.scope;
 const ARQUIVOS = [
@@ -38,12 +38,13 @@ self.addEventListener('fetch', e => {
 
   // Páginas: rede primeiro (sempre pega a versão nova), cache se estiver offline
   if (req.mode === 'navigate') {
+    const pagina = new URL(req.url); pagina.search = ''; pagina.hash = '';
+    if (pagina.pathname.endsWith('/proposta.html')) return; // página pública do cliente: sempre da rede
     e.respondWith(
       fetch(req).then(r => {
-        const copia = r.clone();
-        caches.open(CACHE).then(c => c.put('./index.html', copia));
+        if (r.ok) { const copia = r.clone(); caches.open(CACHE).then(c => c.put(pagina.href, copia)); }
         return r;
-      }).catch(() => caches.match('./index.html', { ignoreSearch: true }))
+      }).catch(() => caches.match(pagina.href).then(r => r || caches.match('./index.html', { ignoreSearch: true })))
     );
     return;
   }
