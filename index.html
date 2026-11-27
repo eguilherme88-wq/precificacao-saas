@@ -1212,7 +1212,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
     <div class="eyebrow">Licenciamento de software · ${m12?'12 meses':'mensal'}</div>
     <h1>${esc(d.sistema?.nome||'Módulos de software')}</h1>
     <div class="cliente-sub">${esc(d.p.cliente)}</div>
-    <p>Apresentamos o escopo dos módulos propostos, com a descrição das funcionalidades de cada um, o investimento e as condições comerciais para o licenciamento${m12?' anual':''}.</p>
+    <p>Apresentamos o escopo dos módulos propostos, ${d.modulos.some(m=>(m.desc||'').trim())?'com a descrição das funcionalidades de cada um, ':''}o investimento e as condições comerciais para o licenciamento${m12?' anual':''}.</p>
   </section>
 
   <div class="partes">
