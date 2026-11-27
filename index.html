@@ -1575,7 +1575,8 @@ setTimeout(()=>loginUsuario.focus(),50);
 /* ===== Aplicativo instalável (PWA) + backup ===== */
 (function(){
   const ehDesktop=/Electron/i.test(navigator.userAgent);
-  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const modoApp=()=>['standalone','window-controls-overlay','minimal-ui'].some(m=>matchMedia(`(display-mode: ${m})`).matches)||navigator.standalone===true||new URLSearchParams(location.search).get('origem')==='app';
+  const standalone=modoApp();
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const btn=document.getElementById('btnInstalarApp'),dica=document.getElementById('appDica'),status=document.getElementById('appStatus');
   let promptInstalar=null;
@@ -1586,7 +1587,9 @@ setTimeout(()=>loginUsuario.focus(),50);
   else if(ios){dica.innerHTML='No iPhone/iPad: abra no <b>Safari</b>, toque em <b>Compartilhar</b> (□↑) e depois em <b>Adicionar à Tela de Início</b>.';}
   else{dica.textContent='Se o botão não aparecer, use o menu do navegador (⋮) → "Instalar app" ou "Adicionar à tela inicial".';}
   const btnTopo=document.getElementById('btnInstalarTopo');
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstalar=e;btn.hidden=false;if(btnTopo)btnTopo.hidden=false;});
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();if(ehDesktop||modoApp())return;promptInstalar=e;btn.hidden=false;if(btnTopo)btnTopo.hidden=false;});
+  ['standalone','window-controls-overlay','minimal-ui'].forEach(m=>matchMedia(`(display-mode: ${m})`).addEventListener?.('change',ev=>{if(ev.matches){btn.hidden=true;if(btnTopo)btnTopo.hidden=true;}}));
+  if(ehDesktop||standalone){btn.hidden=true;if(btnTopo)btnTopo.hidden=true;}
   window.addEventListener('appinstalled',()=>{btn.hidden=true;if(btnTopo)btnTopo.hidden=true;promptInstalar=null;status.textContent='✅ Aplicativo instalado! Procure por "Precificação" no menu de aplicativos.';});
   window.instalarApp=async function(){if(!promptInstalar){alert(ios?'No iPhone/iPad: Safari → Compartilhar → Adicionar à Tela de Início.':'Use o ícone de instalar na barra de endereço do navegador, ou o menu ⋮ → Transmitir, salvar e compartilhar → Instalar página como app.');return;}promptInstalar.prompt();await promptInstalar.userChoice;promptInstalar=null;btn.hidden=true;if(btnTopo)btnTopo.hidden=true;};
   const sec=location.hash.slice(1);
