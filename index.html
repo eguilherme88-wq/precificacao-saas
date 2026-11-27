@@ -422,7 +422,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
 
       <div class="row" style="margin-top:20px;">
         <div><label>Meio de Pagamento</label><select id="pMeioPagamento" onchange="alternarOutroPagamento()"><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Boleto">Boleto</option><option value="Outro">Outro</option></select><input id="pMeioOutro" style="display:none;margin-top:8px" placeholder="Informe o outro meio de pagamento"></div>
-        <div><label>Observação da Condição</label><input id="pCondicao" placeholder="Observação opcional"></div>
+        <div><label>Observação da Condição</label><input id="pCondicao" placeholder="Observação opcional"><label class="opc-check" style="margin-top:10px;font-weight:600"><input type="checkbox" id="pMostrarDescVolume"> Mostrar nas condições comerciais: “Desconto por volume de 10% a partir de 10 módulos”</label></div>
         <div><label>E-mail para receber o aceite</label><input id="pEmailAceite" type="email" placeholder="comercial@suaempresa.com.br"><small class="muted">Preenchido automaticamente com o e-mail do cliente selecionado.</small></div>
         <div><label>WhatsApp para receber o aceite</label><input id="pWhatsAceite" placeholder="(00) 00000-0000"><small class="muted">Preenchido automaticamente com o telefone do cliente selecionado.</small></div>
       </div>
@@ -987,8 +987,6 @@ function salvarProposta(){
     const m=db.modulos.find(x=>x.id===cb.value);
     if(m)mensal+=Number(m.anual)||0;
   });
-  const semDesc=modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(m=>m&&!(m.desc||'').trim());
-  if(semDesc.length&&!confirm(`${semDesc.length} módulo(s) sem descrição cadastrada:\n\n• ${semDesc.map(m=>m.nome).join('\n• ')}\n\nA proposta mostra a descrição de cada módulo. Deseja gerar mesmo assim?`))return;
   const modsSel=modulosIds.map(id=>db.modulos.find(m=>m.id===id)).filter(Boolean);
   const oh=valoresHospForm();
   if(modsSel.some(m=>m.taxaHospedagem)&&(!(oh.taxa>0)))return alert('Informe o valor da taxa de hospedagem.');
@@ -1013,7 +1011,7 @@ function salvarProposta(){
     modulosIds,
     valores:Object.fromEntries(modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return [id,m?.taxaHospedagem&&oh.taxa!=null?Number(oh.taxa):Number(m?.anual)||0];})),
     mensalModulos,hospedagem:hosp.aplica?{taxaBase:hosp.taxaBase,adicionais:hosp.adicionais,valorAdicional:hosp.valorAdicional,valor:hosp.valor,incluidos:hosp.incluidos,sistemas:hosp.sistemas}:null,
-    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:(pOpc1.checked&&pOpc2.checked)?'duas_opcoes':(pOpc1.checked?'parcelado':'avista'),opcoesPagamento:{parcelado:pOpc1.checked,avista:pOpc2.checked},meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
+    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:(pOpc1.checked&&pOpc2.checked)?'duas_opcoes':(pOpc1.checked?'parcelado':'avista'),opcoesPagamento:{parcelado:pOpc1.checked,avista:pOpc2.checked},mostrarDescVolume:pMostrarDescVolume.checked,meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
 
@@ -1063,7 +1061,7 @@ function editarProposta(id){
   if(opcoes.includes(p.meioPagamento)){pMeioPagamento.value=p.meioPagamento;alternarOutroPagamento();}
   else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
   pCondicao.value=p.condicao||'';
-  {const op=opcoesPagamento(p);pOpc1.checked=op.parcelado;pOpc2.checked=op.avista;atualizarOpcoesForm();}
+  {const op=opcoesPagamento(p);pOpc1.checked=op.parcelado;pOpc2.checked=op.avista;atualizarOpcoesForm();pMostrarDescVolume.checked=!!p.mostrarDescVolume;}
   {const hm=db.modulos.find(m=>m.taxaHospedagem&&ids.has(m.id));
    if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;pHospIncluidos.value=p.hospedagem?.incluidos??hm.hospIncluidos??1;}}
   pEmailAceite.value=p.emailAceite||pEmailAceite.value;
@@ -1078,7 +1076,7 @@ function limparPropostaForm(){
   if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';pHospIncluidos.value='';}
   editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
-  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';pOpc1.checked=pOpc2.checked=true;atualizarOpcoesForm();
+  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';pOpc1.checked=pOpc2.checked=true;atualizarOpcoesForm();pMostrarDescVolume.checked=false;
   pData.value=new Date().toISOString().slice(0,10);
   renderizarCheckModulos();
   calcularTotalProposta();
@@ -1124,7 +1122,7 @@ function htmlProposta(id,modo='imprimir'){
   const cli=d.cliente||{};
   const linhas=d.modulos.map((m,i)=>{
     const desc=(m.desc||'').trim();
-    return `<tr><td class="n">${String(i+1).padStart(2,'0')}</td><td><div class="mod-nome">${esc(m.nome)}${nomeCat(m)?`<span class="cat">${esc(nomeCat(m))}</span>`:''}</div><p class="mod-desc${desc?'':' vazia'}">${desc?esc(desc):'Descrição não informada.'}</p></td><td class="v">${fmtMod(m)}</td><td class="v">${fmtMod(m,12)}</td></tr>`;
+    return `<tr><td class="n">${String(i+1).padStart(2,'0')}</td><td><div class="mod-nome">${esc(m.nome)}${nomeCat(m)?`<span class="cat">${esc(nomeCat(m))}</span>`:''}</div>${desc?`<p class="mod-desc">${esc(desc)}</p>`:''}</td><td class="v">${fmtMod(m)}</td><td class="v">${fmtMod(m,12)}</td></tr>`;
   }).join('');
   const hP=d.p.hospedagem;
   const linhaHosp=hP&&hP.adicionais?`<tr class="linha-hosp"><td class="n">+</td><td><div class="mod-nome">Adicional de hospedagem<span class="cat">${hP.adicionais} sistema${hP.adicionais===1?'':'s'} × ${fmt(hP.valorAdicional)}</span></div><p class="mod-desc">${esc(textoHospedagem(hP))}</p></td><td class="v">${fmt(hP.valor)}</td><td class="v">${fmt(hP.valor*12)}</td></tr>`:'';
@@ -1247,7 +1245,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
     <li>Meio de pagamento: <b>${esc(d.p.meioPagamento||'-')}</b>.</li>
     ${opcoesPagamento(d.p).parcelado?`<li>Pagamento parcelado em 12 vezes de ${fmt(c.parcela)}.</li>`:''}
     ${opcoesPagamento(d.p).avista?'<li>Pagamento à vista com 10% de desconto sobre o valor do contrato.</li>':''}
-    <li>Desconto por volume de 10% para propostas a partir de ${MIN_MODULOS_DESCONTO} módulos${c.temVolume?' (aplicado nesta proposta)':''}.</li>
+    ${d.p.mostrarDescVolume?`<li>Desconto por volume de 10% para propostas a partir de ${MIN_MODULOS_DESCONTO} módulos${c.temVolume?' (aplicado nesta proposta)':''}.</li>`:''}
     ${d.p.condicao?`<li>Observação: ${esc(d.p.condicao)}</li>`:''}
   </ul>
 
