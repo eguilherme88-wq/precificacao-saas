@@ -1412,6 +1412,8 @@ function mensagemEnvio(id,comAnexo){
   return `Olá${d.p.contato?', '+d.p.contato:''}! ${comAnexo?'Segue em anexo (PDF)':'Segue'} a proposta comercial nº ${num} do ${d.sistema?.nome||'sistema'} para ${d.p.cliente}, com ${d.modulos.length} módulo(s).\n\n${(()=>{const op=opcoesPagamento(d.p);const pc=mostra12(d.p)?`12 parcelas de ${fmt(c.parcela)}`:`mensalidade de ${fmt(c.parcela)}`;return op.ambas?`Opção 1: ${pc}\nOpção 2: à vista por ${fmt(c.total)}`:op.parcelado?`Pagamento: ${pc}`:`Pagamento à vista: ${fmt(c.total)}`;})()}${c.temVolume?'\n(já com 10% de desconto por volume)':''}\n\n✅ Para aceitar a proposta:\n${linkAceite(d.p)}`;
 }
 
+// Abre a tela de escrever do Gmail já preenchida (funciona mesmo sem programa de e-mail configurado no computador)
+function gmailUrl(para,assunto,corpo){return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;}
 // ===== Janela de envio (WhatsApp / e-mail) =====
 let envioAtual=null;
 async function abrirEnvio(id,canal){
@@ -1439,13 +1441,14 @@ function renderEnvio(){
   else{envioStatus.className='envio-status erro';envioStatus.innerHTML='⚠️ <span>Não foi possível gerar o PDF automaticamente. Verifique a conexão com a internet e tente de novo, ou use o botão <b>📄 PDF</b> do histórico para salvar o arquivo manualmente.</span>';}
   let b='';
   if(share)b+=`<button class="primary" onclick="compartilharPdf()">📎 Enviar com o PDF anexado</button>`;
-  if(estado==='pronto')b+=`<button class="${share?'secondary':'primary'}" onclick="baixarEAbrir()">⬇️ Baixar PDF e abrir o ${nomeCanal}</button><button class="secondary" onclick="baixarArquivo(envioAtual.file)">⬇️ Só baixar o PDF</button>`;
+  if(estado==='pronto'&&canal==='email')b+=`<button class="${share?'secondary':'primary'}" onclick="baixarEAbrir('gmail')">📧 Baixar PDF e abrir no Gmail</button>`;
+  if(estado==='pronto')b+=`<button class="secondary" onclick="baixarEAbrir()">⬇️ Baixar PDF e abrir o ${nomeCanal}</button><button class="secondary" onclick="baixarArquivo(envioAtual.file)">⬇️ Só baixar o PDF</button>`;
   if(estado==='erro')b+=`<button class="primary" onclick="abrirEnvio(envioAtual.id,envioAtual.canal)">↻ Tentar gerar o PDF novamente</button>`;
   b+=`<button class="secondary" onclick="enviarSoMensagem()">${canal==='whatsapp'?'💬':'✉️'} Enviar só a mensagem (sem anexo)</button>`;
   envioAcoes.innerHTML=b;
   envioDica.innerHTML=estado!=='pronto'?'':share
     ?`Em <b>Enviar com o PDF anexado</b>, escolha ${canal==='whatsapp'?'o <b>WhatsApp</b> e depois o contato do cliente':'o seu aplicativo de <b>e-mail</b>'} na janela de compartilhamento. O PDF vai anexado junto com a mensagem e o link de aceite.`
-    :`Este navegador não permite anexar arquivos automaticamente. Em <b>Baixar PDF e abrir o ${nomeCanal}</b>, o PDF é salvo na pasta Downloads e ${canal==='whatsapp'?'a conversa com o cliente':'o e-mail para o cliente'} abre com a mensagem pronta. Depois é só anexar o arquivo${canal==='whatsapp'?' (no WhatsApp Web, clique no 📎 ou arraste o PDF para a conversa)':''}.`;
+    :`${canal==='email'?'<b>Importante:</b> o sistema não envia o e-mail sozinho — ele abre o e-mail pronto e você precisa clicar em <b>Enviar</b>. Se você usa o Gmail pelo navegador, prefira <b>Abrir no Gmail</b>. ':''}Este navegador não permite anexar arquivos automaticamente. Em <b>Baixar PDF e abrir o ${nomeCanal}</b>, o PDF é salvo na pasta Downloads e ${canal==='whatsapp'?'a conversa com o cliente':'o e-mail para o cliente'} abre com a mensagem pronta. Depois é só anexar o arquivo${canal==='whatsapp'?' (no WhatsApp Web, clique no 📎 ou arraste o PDF para a conversa)':''}.`;
 }
 async function compartilharPdf(){
   if(!envioAtual?.file)return;const {id,canal,file}=envioAtual;const d=dadosProposta(id);
@@ -1453,11 +1456,12 @@ async function compartilharPdf(){
   try{await navigator.share(dados);fecharEnvio();}
   catch(e){if(e.name!=='AbortError'){console.error(e);alert(`Não foi possível compartilhar o arquivo por aqui. Use "Baixar PDF e abrir o ${canal==='whatsapp'?'WhatsApp':'e-mail'}".`);}}
 }
-function baixarEAbrir(){
+function baixarEAbrir(via){
   if(!envioAtual?.file)return;const {id,canal,file}=envioAtual;const d=dadosProposta(id);
   baixarArquivo(file);
   const msg=mensagemEnvio(id,true);
   if(canal==='whatsapp')window.open(`https://wa.me/${telefoneComPais(d.cliente?.telefone)}?text=${encodeURIComponent(msg)}`,'_blank');
+  else if(via==='gmail')window.open(gmailUrl((d.cliente?.email||'').trim(),'Proposta Comercial - '+d.p.cliente,msg+'\n\n📎 Anexo: '+file.name),'_blank');
   else location.href=`mailto:${encodeURIComponent((d.cliente?.email||'').trim())}?subject=${encodeURIComponent('Proposta Comercial - '+d.p.cliente)}&body=${encodeURIComponent(msg+'\n\n📎 Anexo: '+file.name)}`;
 }
 function enviarSoMensagem(){if(!envioAtual)return;const {id,canal}=envioAtual;fecharEnvio();canal==='whatsapp'?enviarWhatsApp(id):enviarEmail(id);}
@@ -1479,10 +1483,12 @@ function enviarEmail(id){
 .topbar span{font-size:14px;font-weight:700}
 .topbar a.btn{background:#155eef;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;font-size:14px;white-space:nowrap}
 .topbar a.btn:hover{background:#0f4dcc}
+.topbar .bts{display:flex;gap:8px;flex-wrap:wrap}.topbar .btn{border:0;cursor:pointer;font-family:inherit}.topbar .btn.sec{background:#ffffff1f;color:#fff;padding:11px 16px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none}
 .note{max-width:680px;margin:16px auto 0;background:#fffaeb;border:1px solid #fde8b0;color:#7a5a00;font-size:12.5px;padding:10px 16px;border-radius:8px}
 .wrap{padding:10px 0 40px}</style></head><body>
-<div class="topbar"><span>📧 Prévia visual da proposta enviada por e-mail</span><a class="btn" href="${mailtoHref}">✉️ Continuar no seu e-mail</a></div>
-<div class="note">Este é o visual que representa a proposta. Como e-mails não exibem HTML a partir do link "mailto", clique em <b>"Continuar no seu e-mail"</b> para abrir seu cliente de e-mail com o texto pronto (incluindo o link de aceite), ou copie o conteúdo abaixo diretamente para o corpo do e-mail.</div>
+<div class="topbar"><span>📧 Prévia visual da proposta enviada por e-mail</span><div class="bts"><a class="btn" href="${esc(gmailUrl(email,assunto,corpoTexto))}" target="_blank" rel="noopener">📧 Abrir no Gmail</a><a class="btn sec" href="${mailtoHref}">✉️ Outro programa de e-mail</a><button class="btn sec" onclick="navigator.clipboard.writeText(document.getElementById('txt').value).then(()=>{this.textContent='✔ Texto copiado'})">📋 Copiar texto</button></div></div>
+<textarea id="txt" hidden>${esc(corpoTexto)}</textarea>
+<div class="note">Este é o visual que representa a proposta. Como e-mails não exibem HTML a partir do link "mailto", o sistema <b>não envia o e-mail sozinho</b>: clique em <b>"Abrir no Gmail"</b> (ou "Outro programa de e-mail"), confira o texto com o link de aceite e clique em <b>Enviar</b>. Se nada abrir, use <b>"Copiar texto"</b> e cole num e-mail novo.</div>
 <div class="wrap">${corpoEmailHtml(id)}</div>
 </body></html>`;
   const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para visualizar o e-mail da proposta.');w.document.open();w.document.write(preview);w.document.close();
@@ -1547,7 +1553,7 @@ function atualizarTudo(){
   atualizarPreviewMassa();
 
   histTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Sistema</th><th>Opções comerciais</th><th>Valor total</th><th>Status</th><th>Ações</th></tr></thead><tbody>${db.propostas.map(p=>{
-    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small>${p.aceite?`<br><span class="badge ok" title="${esc(p.aceite.nome)} · ${esc(p.aceite.email)}">✅ Aceita online ${esc(dataHoraBR(p.aceite.dataHora))}</span>`:(p.linkPublicado?'<br><small class="muted">🔗 link enviado</small>':'')}</td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);const op=opcoesPagamento(p);return `${op.parcelado?(mostra12(p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`):`À vista ${fmt(c.total)}`}${op.ambas?'<br><small>ou à vista com 10%</small>':op.parcelado?'<br><small>somente parcelado</small>':'<br><small>somente à vista (10% off)</small>'}${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${opcoesPagamento(p).avista?fmt(p.total):(mostra12(p)?fmt(p.subtotal??p.total):fmt(p.parcela)+'/mês')}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
+    const st=p.status||'Pendente';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b><br><small class="muted">${esc(p.contato)}</small>${p.aceite?`<br><span class="badge ok" title="${esc(p.aceite.nome)} · ${esc(p.aceite.email)}">✅ Aceita online ${esc(dataHoraBR(p.aceite.dataHora))}</span>`:(p.linkPublicado?'<br><small class="muted" title="O link da proposta foi gerado. Confirme no seu e-mail/WhatsApp se a mensagem foi enviada.">🔗 link gerado</small>':'')}</td><td>${esc(db.sistemas.find(s=>s.id===p.sistemaId)?.nome||'Módulos independentes')}</td><td>${(()=>{const c=condicoesProposta(p);const op=opcoesPagamento(p);return `${op.parcelado?(mostra12(p)?`12 × ${fmt(c.parcela)}`:`${fmt(c.parcela)}/mês`):`À vista ${fmt(c.total)}`}${op.ambas?'<br><small>ou à vista com 10%</small>':op.parcelado?'<br><small>somente parcelado</small>':'<br><small>somente à vista (10% off)</small>'}${c.temVolume?'<br><span class="badge ok">−10% volume</span>':''}`})()}</td><td><b>${opcoesPagamento(p).avista?fmt(p.total):(mostra12(p)?fmt(p.subtotal??p.total):fmt(p.parcela)+'/mês')}</b></td><td><select onchange="alterarStatusProposta('${p.id}',this.value)" style="min-width:110px"><option ${st==='Pendente'?'selected':''}>Pendente</option><option ${st==='Aceita'?'selected':''}>Aceita</option><option ${st==='Recusada'?'selected':''}>Recusada</option></select></td><td class="nowrap"><button class="secondary" onclick="editarProposta('${p.id}')">✏️ Editar</button> <button class="secondary" onclick="gerarPdfProposta('${p.id}')">📄 PDF</button> <button class="secondary" onclick="abrirEnvio('${p.id}','whatsapp')">💬 WhatsApp</button> <button class="secondary" onclick="abrirEnvio('${p.id}','email')">✉️ E-mail</button> <button class="danger" onclick="excluirProposta('${p.id}')">Excluir</button></td></tr>`;
   }).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta gerada ainda.</div>';
 
   dashTabela.innerHTML=db.propostas.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Valor à vista</th><th>Status</th></tr></thead><tbody>${db.propostas.slice(0,5).map(p=>{const st=p.status||'Pendente',cl=st==='Aceita'?'ok':st==='Recusada'?'warn':'info';return `<tr><td class="nowrap">${esc(dataBR(p.data))}</td><td><b>${esc(p.cliente)}</b></td><td>12 parcelas ou à vista<br><small>${esc(p.meioPagamento||'')}</small></td><td>${fmt(p.total)}</td><td><span class="badge ${cl}">${st==='Aceita'?'✅ ':st==='Recusada'?'❌ ':'⏳ '}${st}</span></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhuma proposta registrada.</div>';
