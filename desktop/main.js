@@ -38,8 +38,17 @@ function criarJanela() {
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } }
     };
   });
-  janela.webContents.on('will-navigate', (e, url) => { if (ehExterno(url)) { e.preventDefault(); shell.openExternal(url); } });
 }
+
+// Vale para TODAS as janelas (inclusive a prévia do e-mail aberta pelo app):
+// mailto:, WhatsApp e sites vão para o programa padrão do Windows.
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-navigate', (e, url) => { if (ehExterno(url)) { e.preventDefault(); shell.openExternal(url); } });
+  if (wc !== janela?.webContents) wc.setWindowOpenHandler(({ url }) => {
+    if (ehExterno(url)) { shell.openExternal(url); return { action: 'deny' }; }
+    return { action: 'allow' };
+  });
+});
 
 app.on('second-instance', () => {
   if (janela) { if (janela.isMinimized()) janela.restore(); janela.focus(); }
