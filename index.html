@@ -435,6 +435,7 @@ html[data-theme="dark"] tr.mod-sel td{background:#1a2a4d}html[data-theme="dark"]
         <p style="margin:5px 0;display:none" id="linhaDescVolume"><b>Desconto por volume (10% a partir de 10 módulos):</b> <span id="resDescVolume" style="color:#079455;font-weight:700">- R$ 0,00</span></p>
         <p style="margin:5px 0;display:none" id="linhaSubtotal"><b>Valor do contrato com desconto:</b> <span id="resSubtotal">R$ 0,00</span></p>
         <div id="avisoVolume" class="aviso-volume"></div>
+        <label class="opc-check" id="boxAutorizarDesc" style="display:none;margin-top:10px;color:#067647"><input type="checkbox" id="pAutorizarDesc" onchange="calcularTotalProposta()"> Autorizar desconto por volume (10% a partir de 10 módulos)</label>
         <p class="muted" style="margin:12px 0 0">Marque quais formas de pagamento vão aparecer no orçamento (uma ou as duas).</p>
         <label class="opc-check" style="margin-top:10px"><input type="checkbox" id="pMostrar12" checked> Mostrar valores de 12 meses na proposta (coluna “12 meses”, valor anual e “12 × parcelas”). Desmarcado: aparece só o valor mensal.</label>
         <div class="row" style="margin-top:14px">
@@ -872,15 +873,16 @@ function renderizarCheckModulos(){
 
 // ===== Regras de desconto =====
 const MIN_MODULOS_DESCONTO=10,PCT_DESCONTO_VOLUME=0.10,PCT_DESCONTO_AVISTA=0.10;
-function calcularCondicoes(mensal,qtd){
+function calcularCondicoes(mensal,qtd,autorizado=true){
   mensal=Number(mensal)||0;
   const bruto=arred(mensal*12);
-  const temVolume=qtd>=MIN_MODULOS_DESCONTO;
+  const elegivelVolume=qtd>=MIN_MODULOS_DESCONTO;
+  const temVolume=elegivelVolume&&autorizado!==false;
   const descontoVolume=temVolume?arred(bruto*PCT_DESCONTO_VOLUME):0;
   const subtotal=arred(bruto-descontoVolume);
   const parcela=arred(subtotal/12);
   const desconto=arred(subtotal*PCT_DESCONTO_AVISTA);
-  return {mensal,bruto,qtd,temVolume,descontoVolume,subtotal,parcela,desconto,total:arred(subtotal-desconto)};
+  return {mensal,bruto,qtd,elegivelVolume,temVolume,descontoVolume,subtotal,parcela,desconto,total:arred(subtotal-desconto)};
 }
 // As condições são sempre calculadas pela quantidade de módulos da proposta:
 // a partir de 10 módulos o desconto de 10% entra automaticamente, inclusive em propostas antigas.
@@ -890,7 +892,7 @@ function atualizarOpcoesForm(el){
   if(el&&!pOpc1.checked&&!pOpc2.checked){el.checked=true;alert('Deixe pelo menos uma opção de pagamento marcada.');}
   cardOpc1.classList.toggle('opc-off',!pOpc1.checked);cardOpc2.classList.toggle('opc-off',!pOpc2.checked);
 }
-function condicoesProposta(p){return calcularCondicoes(p.mensal,qtdPagos((p.modulosIds||[]).map(id=>{const m=db.modulos.find(x=>x.id===id);if(!m)return {};const v=(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual;return {gratuito:!!m.gratuito&&Number(v)===0};})));}
+function condicoesProposta(p){return calcularCondicoes(p.mensal,qtdPagos((p.modulosIds||[]).map(id=>{const m=db.modulos.find(x=>x.id===id);if(!m)return {};const v=(p.valores&&p.valores[id]!=null)?p.valores[id]:m.anual;return {gratuito:!!m.gratuito&&Number(v)===0};})),p.aplicarDescVolume!==false);}
 function recalcularProposta(p){
   const c=condicoesProposta(p);
   const campos={bruto:c.bruto,descontoVolume:c.descontoVolume,subtotal:c.subtotal,parcela:c.parcela,desconto:c.desconto,total:c.total};
@@ -911,7 +913,8 @@ function calcularTotalProposta(){
   linhaHosp.style.display=hosp.aplica?'block':'none';
   resHosp.textContent=hosp.adicionais?`${hosp.adicionais} × ${fmt(hosp.valorAdicional)} = ${fmt(hosp.valor)}/mês`:'sem adicional';
   resHospDet.textContent=hosp.aplica?textoHospedagem(hosp):'';
-  const qtd=qtdPagos(modsSel),c=calcularCondicoes(mensal,qtd);
+  const qtd=qtdPagos(modsSel),c=calcularCondicoes(mensal,qtd,pAutorizarDesc.checked);
+  boxAutorizarDesc.style.display=c.elegivelVolume?'flex':'none';
   resMensalProposta.textContent=fmt(c.mensal);resBruto.textContent=fmt(c.bruto);
   linhaDescVolume.style.display=linhaSubtotal.style.display=c.temVolume?'block':'none';
   resDescVolume.textContent='- '+fmt(c.descontoVolume);resSubtotal.textContent=fmt(c.subtotal);
@@ -919,6 +922,7 @@ function calcularTotalProposta(){
   resParcelas.textContent=`12 parcelas de ${fmt(c.parcela)}`;
   resParcelasObs.textContent=c.temVolume?'Já com 10% de desconto por volume.':'Sem desconto.';
   if(!qtd){avisoVolume.textContent=modsSel.length?'Somente módulos gratuitos selecionados.':'';avisoVolume.className='aviso-volume';}
+  else if(c.elegivelVolume&&!c.temVolume){avisoVolume.textContent=`⚠️ ${qtd} módulos selecionados: proposta elegível ao desconto por volume de 10%. Marque “Autorizar desconto por volume” para aplicar.`;avisoVolume.className='aviso-volume';}
   else if(c.temVolume){avisoVolume.textContent=`🎉 Desconto por volume aplicado: ${qtd} módulos selecionados (10% sobre o valor total).`;avisoVolume.className='aviso-volume ativo';}
   else{const f=MIN_MODULOS_DESCONTO-qtd;avisoVolume.textContent=`💡 ${qtd} módulo(s) pago(s) selecionado(s). ${f===1?'Falta 1 módulo':'Faltam '+f+' módulos'} para ganhar 10% de desconto por volume.`;avisoVolume.className='aviso-volume';}
   atualizarDescricoesSelecionados();
@@ -996,7 +1000,7 @@ function salvarProposta(){
   mensal=somaMensalProposta(modsSel,oh);
   const hosp=calcularHospedagem(modsSel,oh);
   const mensalModulos=mensal;mensal=arred(mensal+hosp.valor);
-  const cond=calcularCondicoes(mensal,qtdPagos(modsSel));
+  const cond=calcularCondicoes(mensal,qtdPagos(modsSel),pAutorizarDesc.checked);
   const {bruto,descontoVolume,subtotal,parcela,desconto,total}=cond;
   const meioPagamento=pMeioPagamento.value==='Outro'?(pMeioOutro.value.trim()||'Outro'):pMeioPagamento.value;
   const emailAceite=pEmailAceite.value.trim(),whatsAceite=pWhatsAceite.value.trim();
@@ -1013,7 +1017,7 @@ function salvarProposta(){
     modulosIds,
     valores:Object.fromEntries(modulosIds.map(id=>{const m=db.modulos.find(x=>x.id===id);return [id,m?.taxaHospedagem&&oh.taxa!=null?Number(oh.taxa):Number(m?.anual)||0];})),
     mensalModulos,hospedagem:hosp.aplica?{taxaBase:hosp.taxaBase,adicionais:hosp.adicionais,valorAdicional:hosp.valorAdicional,valor:hosp.valor,incluidos:hosp.incluidos,sistemas:hosp.sistemas}:null,
-    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:(pOpc1.checked&&pOpc2.checked)?'duas_opcoes':(pOpc1.checked?'parcelado':'avista'),opcoesPagamento:{parcelado:pOpc1.checked,avista:pOpc2.checked},mostrarDescVolume:pMostrarDescVolume.checked,mostrar12Meses:pMostrar12.checked,meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
+    mensal,bruto,descontoVolume,subtotal,parcela,total,desconto,pagamento:(pOpc1.checked&&pOpc2.checked)?'duas_opcoes':(pOpc1.checked?'parcelado':'avista'),opcoesPagamento:{parcelado:pOpc1.checked,avista:pOpc2.checked},mostrarDescVolume:pMostrarDescVolume.checked,mostrar12Meses:pMostrar12.checked,aplicarDescVolume:pAutorizarDesc.checked,meioPagamento,prazoMeses:12,emailAceite,whatsAceite,status:'Pendente',
     condicao:pCondicao.value.trim()
   };
 
@@ -1063,7 +1067,7 @@ function editarProposta(id){
   if(opcoes.includes(p.meioPagamento)){pMeioPagamento.value=p.meioPagamento;alternarOutroPagamento();}
   else{pMeioPagamento.value='Outro';alternarOutroPagamento();pMeioOutro.value=p.meioPagamento||'';}
   pCondicao.value=p.condicao||'';
-  {const op=opcoesPagamento(p);pOpc1.checked=op.parcelado;pOpc2.checked=op.avista;atualizarOpcoesForm();pMostrarDescVolume.checked=!!p.mostrarDescVolume;pMostrar12.checked=mostra12(p);}
+  {const op=opcoesPagamento(p);pOpc1.checked=op.parcelado;pOpc2.checked=op.avista;atualizarOpcoesForm();pMostrarDescVolume.checked=!!p.mostrarDescVolume;pMostrar12.checked=mostra12(p);pAutorizarDesc.checked=p.aplicarDescVolume!==false;}
   {const hm=db.modulos.find(m=>m.taxaHospedagem&&ids.has(m.id));
    if(hm){boxTaxaHosp.dataset.hid=hm.id;pTaxaHosp.value=(p.valores&&p.valores[hm.id]!=null)?p.valores[hm.id]:hm.anual;pHospAdicional.value=p.hospedagem?.valorAdicional??hm.hospAdicional??80;pHospIncluidos.value=p.hospedagem?.incluidos??hm.hospIncluidos??1;}}
   pEmailAceite.value=p.emailAceite||pEmailAceite.value;
@@ -1078,7 +1082,7 @@ function limparPropostaForm(){
   if(typeof boxTaxaHosp!=='undefined'){boxTaxaHosp.dataset.hid='';pTaxaHosp.value='';pHospAdicional.value='';pHospIncluidos.value='';}
   editandoPropostaId=null;if(typeof avisoEdicao!=='undefined')atualizarModoEdicaoProposta();
   pCliente.value='';pContato.value='';
-  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';pOpc1.checked=pOpc2.checked=true;atualizarOpcoesForm();pMostrarDescVolume.checked=false;pMostrar12.checked=true;
+  pSistema.value='';pMeioPagamento.value='PIX';pMeioOutro.value='';alternarOutroPagamento();pCondicao.value='';pOpc1.checked=pOpc2.checked=true;atualizarOpcoesForm();pMostrarDescVolume.checked=false;pMostrar12.checked=true;pAutorizarDesc.checked=false;
   pData.value=new Date().toISOString().slice(0,10);
   renderizarCheckModulos();
   calcularTotalProposta();
