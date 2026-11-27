@@ -309,6 +309,7 @@ html[data-theme="dark"] .menu-btn{background:#182440!important;color:#e4e9f2!imp
     <button class="tab" onclick="abrir('proposta',this)">📄 Montar Proposta</button>
     <button class="tab" onclick="abrir('historico',this)">📋 Histórico de Propostas</button>
     <div class="nav-label">Conta</div>
+    <button class="tab" onclick="abrir('empresa',this)">🏢 Minha Empresa</button>
     <button class="tab" onclick="abrir('seguranca',this)">🔐 Segurança</button>
   </nav>
   <footer class="sidebar-direitos">
@@ -535,6 +536,30 @@ html[data-theme="dark"] .menu-btn{background:#182440!important;color:#e4e9f2!imp
     <div class="card"><div id="histTabela"></div></div>
   </section>
 
+  <section id="empresa" class="section">
+    <div class="card form-card">
+      <h2 class="title">🏢 Minha Empresa (Contratada)</h2>
+      <p class="muted">Estes dados aparecem nas propostas como <b>Contratada</b>. Ao enviar uma proposta (link, WhatsApp, e-mail ou PDF), ela sai <b>assinada eletronicamente</b> pelo responsável abaixo, com data, hora e código de registro.</p>
+      <div class="row">
+        <div><label>Razão social *</label><input id="eRazao" placeholder="Sua Empresa LTDA"></div>
+        <div><label>CNPJ *</label><input id="eCnpj" placeholder="00.000.000/0001-00"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>Responsável que assina *</label><input id="eRepresentante" placeholder="Nome completo"></div>
+        <div><label>Cargo</label><input id="eCargo" placeholder="Diretor Comercial"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>E-mail do responsável *</label><input id="eEmail" type="email" placeholder="comercial@suaempresa.com.br"></div>
+        <div><label>Telefone</label><input id="eTelefone" placeholder="(48) 99999-9999"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>Endereço</label><input id="eEndereco" placeholder="Rua, número, bairro"></div>
+        <div><label>Cidade / UF *</label><input id="eCidade" placeholder="Florianópolis/SC"></div>
+      </div>
+      <div class="actions"><button class="primary" onclick="salvarEmpresa()">💾 Salvar dados da empresa</button></div>
+    </div>
+  </section>
+
   <section id="seguranca" class="section">
     <div class="card form-card">
       <h2 class="title">Segurança e Senha</h2>
@@ -571,7 +596,7 @@ const KEY_P='precificacao_modulos_v2';
 const KEY_AUTH='precificacao_auth_v1';
 const HASH_INICIAL='e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7';
 let db=JSON.parse(localStorage.getItem(KEY_P)||'null')||{sistemas:[],categorias:[],clientes:[],modulos:[],propostas:[]};
-db.sistemas=db.sistemas||[];db.categorias=db.categorias||[];db.clientes=db.clientes||[];db.modulos=db.modulos||[];db.propostas=db.propostas||[];
+db.empresa=db.empresa||{};db.sistemas=db.sistemas||[];db.categorias=db.categorias||[];db.clientes=db.clientes||[];db.modulos=db.modulos||[];db.propostas=db.propostas||[];
 let editandoModId=null,editandoSisId=null,editandoCatId=null,editandoCliId=null;
 let selecionadosMod=new Set(),paginaMod=1,ultimaAlteracaoMassa=null;
 let auth=JSON.parse(localStorage.getItem(KEY_AUTH)||'null')||{usuario:'admin',senhaHash:HASH_INICIAL,emailAdmin:''};
@@ -743,6 +768,7 @@ function abrir(id,el){
   el=el||document.querySelector(`.tab[onclick*="'${id}'"]`);
   if(el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active')}
   if(id==='proposta') { renderizarCheckModulos(); calcularTotalProposta(); }
+  if(id==='empresa') preencherEmpresaForm();
   document.body.dataset.secao=id; fecharMenu(); window.scrollTo({top:0});
 }
 function focarFormulario(tituloEl,campo){
@@ -1105,7 +1131,7 @@ function salvarProposta(){
     const existente=db.propostas.find(x=>x.id===editandoPropostaId);
     if(existente){
       const {id,status,...novosDados}=proposta;
-      Object.assign(existente,novosDados,{editadaEm:new Date().toISOString()});
+      Object.assign(existente,novosDados,{editadaEm:new Date().toISOString(),assinaturaContratada:null});
       persist();
       if(existente.linkPublicado)prepararLinkPublico(existente.id);
       alert(`Proposta nº ${existente.id.slice(0,8).toUpperCase()} atualizada com sucesso!`);
@@ -1190,9 +1216,34 @@ function telefoneComPais(v){let n=String(v||'').replace(/\D/g,'');if(n&&n.length
 const URL_PROPOSTA_PUBLICA='https://eguilherme88-wq.github.io/precificacao-saas/proposta.html';
 function linkPublico(p){return p&&p.linkToken&&p.linkPublicado?`${URL_PROPOSTA_PUBLICA}?p=${p.linkToken}`:'';}
 function dataHoraBR(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})+' às '+d.toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo'});}
+// ===== Minha Empresa (contratada) e assinatura eletrônica da contratada =====
+const CAMPOS_EMPRESA={razao:'eRazao',cnpj:'eCnpj',representante:'eRepresentante',cargo:'eCargo',email:'eEmail',telefone:'eTelefone',endereco:'eEndereco',cidade:'eCidade'};
+function preencherEmpresaForm(){const e=db.empresa||{};for(const [k,id] of Object.entries(CAMPOS_EMPRESA)){const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=e[k]||'';}}
+function empresaCompleta(){const e=db.empresa||{};return !!(e.razao&&e.cnpj&&e.representante&&e.email&&e.cidade);}
+function salvarEmpresa(){
+  const e={};for(const [k,id] of Object.entries(CAMPOS_EMPRESA))e[k]=document.getElementById(id).value.trim();
+  if(!e.razao||!e.cnpj||!e.representante||!e.email||!e.cidade)return alert('Preencha os campos obrigatórios (*): razão social, CNPJ, responsável, e-mail e cidade.');
+  if(!e.email.includes('@'))return alert('Informe um e-mail válido.');
+  db.empresa=e;persist();alert('Dados da empresa salvos. As próximas propostas enviadas sairão assinadas eletronicamente por '+e.representante+'.');
+}
+// Registra a assinatura eletrônica da contratada (uma vez por versão da proposta). Retorna false se faltar cadastro.
+function assinarContratada(p){
+  if(!p||p.aceite||p.assinaturaContratada)return true;
+  if(!empresaCompleta())return false;
+  const e=db.empresa;
+  p.assinaturaContratada={empresa:e.razao,cnpj:e.cnpj,nome:e.representante,cargo:e.cargo||'',email:e.email,telefone:e.telefone||'',endereco:e.endereco||'',cidade:e.cidade,dataHora:new Date().toISOString(),registro:crypto.randomUUID()};
+  persist();return true;
+}
+function exigirAssinatura(p){
+  if(assinarContratada(p))return true;
+  alert('Antes de enviar, cadastre os dados da sua empresa em "🏢 Minha Empresa".\n\nA proposta enviada sai com a assinatura eletrônica da contratada (razão social, CNPJ, responsável e e-mail).');
+  abrir('empresa');return false;
+}
+function dadosContratada(p){return p.assinaturaContratada||(db.empresa&&db.empresa.razao?{empresa:db.empresa.razao,cnpj:db.empresa.cnpj,nome:db.empresa.representante,cargo:db.empresa.cargo,email:db.empresa.email,telefone:db.empresa.telefone,endereco:db.empresa.endereco,cidade:db.empresa.cidade}:null);}
 async function prepararLinkPublico(id){
   const p=db.propostas.find(x=>x.id===id);if(!p)return '';
   if(p.aceite)return linkPublico(p);
+  assinarContratada(p);
   if(typeof window.publicarPropostaNuvem!=='function')return linkPublico(p);
   if(!p.linkToken){p.linkToken=crypto.randomUUID();persist();}
   try{await window.publicarPropostaNuvem(p,htmlProposta(id,'link'));if(!p.linkPublicado){p.linkPublicado=true;persist();}}
@@ -1221,6 +1272,7 @@ function htmlProposta(id,modo='imprimir'){
   const logo=document.querySelector('.login-logo')?.src||'';
   const nomeCat=m=>db.categorias.find(x=>x.id===m.categoriaId)?.nome||'';
   const cli=d.cliente||{};
+  const ct=dadosContratada(d.p),asn=d.p.assinaturaContratada;
   const m12=mostra12(d.p);
   const linhas=d.modulos.map((m,i)=>{
     const desc=(m.desc||'').trim();
@@ -1249,7 +1301,7 @@ body{margin:0;font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;co
 .cliente-sub{font-size:14pt;font-weight:600;color:#344054;margin:0 0 10px;line-height:1.3}
 .capa h1{margin:6px 0 4px;font-size:21pt;line-height:1.2;color:#102a56;letter-spacing:-.01em}
 .capa p{margin:0;color:#475467;max-width:150mm}
-.partes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px}
+.partes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:6px}
 .parte{border:1px solid #e4e7ec;border-radius:8px;padding:12px 14px;background:#f8fafc}
 .parte h4{margin:0 0 6px;font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:#667085}
 .parte .nome{font-size:12pt;font-weight:700;color:#102a56}
@@ -1293,13 +1345,15 @@ table{width:100%;border-collapse:collapse}
 .aceite-eletronico{margin:0 0 22px;background:#ecfdf3;border:1.5px solid #079455;border-radius:10px;padding:12px 14px;font-size:9.5pt;color:#054f31;line-height:1.6;break-inside:avoid}
 .aceite-eletronico b{color:#054f31}
 .assin{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:10px}
+.assin-ele{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}.assin-ele .aceite-eletronico{height:calc(100% - 22px)}
+.aguardando{margin:0 0 22px;border:1.5px dashed #d0d5dd;border-radius:10px;padding:12px 14px;font-size:9.5pt;color:#667085;line-height:1.6}
 .assin div{border-top:1px solid #344054;padding-top:6px;font-size:9pt;color:#475467}
 .assin b{display:block;color:#1d2939;font-size:10pt}
 .local{margin-top:22px;font-size:9.5pt;color:#475467}
 .rodape{margin-top:26px;padding-top:10px;border-top:1px solid #e4e7ec;display:flex;justify-content:space-between;font-size:8pt;color:#98a2b3}
 body.arquivo{background:#fff}body.arquivo .pagina{margin:0;padding:0;box-shadow:none;width:186mm;max-width:none}
 @media print{body{background:#fff}.barra{display:none}.pagina{margin:0;padding:0;box-shadow:none;max-width:none}}
-@media(max-width:700px){.pagina{padding:18px;margin:0}.partes,.invest,.assin{grid-template-columns:1fr}}
+@media(max-width:700px){.pagina{padding:18px;margin:0}.partes,.invest,.assin,.assin-ele{grid-template-columns:1fr}}
 `;
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposta ${num} - ${esc(d.p.cliente)}</title><style>${css}</style>${modo==='arquivo'?`<script src="${URL_HTML2PDF}"><\/script>`:''}</head><body class="${modo==='arquivo'?'arquivo':''}">
 ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</span><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>`:''}
@@ -1317,6 +1371,7 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
   </section>
 
   <div class="partes">
+    ${ct?`<div class="parte"><h4>Apresentada por</h4><div class="nome">${esc(ct.empresa)}</div>${ct.cnpj?`<div class="l">CNPJ: ${esc(ct.cnpj)}</div>`:''}${ct.nome?`<div class="l">${esc(ct.nome)}${ct.cargo?' · '+esc(ct.cargo):''}</div>`:''}${[ct.email,ct.telefone].filter(Boolean).length?`<div class="l">${[ct.email,ct.telefone].filter(Boolean).map(esc).join(' · ')}</div>`:''}${[ct.endereco,ct.cidade].filter(Boolean).length?`<div class="l">${[ct.endereco,ct.cidade].filter(Boolean).map(esc).join(' · ')}</div>`:''}</div>`:''}
     <div class="parte"><h4>Preparada para</h4><div class="nome">${esc(d.p.cliente)}</div>${cli.documento?`<div class="l">CPF/CNPJ: ${esc(cli.documento)}</div>`:''}${d.p.contato?`<div class="l">A/C: ${esc(d.p.contato)}</div>`:''}${contatoCli?`<div class="l">${contatoCli}</div>`:''}${cli.cidade?`<div class="l">${esc(cli.cidade)}</div>`:''}</div>
     <div class="parte"><h4>Resumo da proposta</h4><dl><dt>Sistema</dt><dd>${esc(d.sistema?.nome||'Módulos independentes')}</dd><dt>Módulos</dt><dd>${d.modulos.length}</dd>${m12?'<dt>Vigência</dt><dd>12 meses</dd>':''}<dt>Pagamento</dt><dd>${esc(d.p.meioPagamento||'-')}</dd></dl></div>
   </div>
@@ -1357,9 +1412,12 @@ ${modo==='imprimir'?`<div class="barra"><span>Proposta comercial nº ${num}</spa
   <section class="aceite">
     <h2><span>04</span>Aceite</h2>
     <p>Declaro estar de acordo com o escopo e as condições comerciais descritas nesta proposta.</p>
-    ${d.p.aceite?`<div class="aceite-eletronico">✅ <b>Aceite eletrônico registrado</b><br>Data e hora: <b>${esc(dataHoraBR(d.p.aceite.dataHora))}</b> (horário de Brasília)<br>Aceito por: <b>${esc(d.p.aceite.nome||'')}</b> · ${esc(d.p.aceite.email||'')}<br><span style="font-size:8pt;color:#067647">Registro do aceite: ${esc(d.p.linkToken||'')}</span></div>`:''}
-    <div class="assin"><div><b>${esc(d.p.cliente)}</b>${d.p.contato?esc(d.p.contato)+' · ':''}Contratante</div><div><b>&nbsp;</b>Contratada</div></div>
-    <div class="local">Local e data: ______________________________, ____ / ____ / ________</div>
+    <div class="assin-ele">
+      <div>${d.p.aceite?`<div class="aceite-eletronico">✅ <b>Aceite eletrônico da contratante</b><br>Data e hora: <b>${esc(dataHoraBR(d.p.aceite.dataHora))}</b> (horário de Brasília)<br>Aceito por: <b>${esc(d.p.aceite.nome||'')}</b> · ${esc(d.p.aceite.email||'')}<br><span style="font-size:8pt;color:#067647">Registro do aceite: ${esc(d.p.linkToken||'')}</span></div>`:'<div class="aguardando">⏳ Aguardando aceite eletrônico da contratante pelo link da proposta.</div>'}</div>
+      <div>${asn?`<div class="aceite-eletronico">✍️ <b>Assinatura eletrônica da contratada</b><br>Data e hora: <b>${esc(dataHoraBR(asn.dataHora))}</b> (horário de Brasília)<br>Assinado por: <b>${esc(asn.nome)}</b>${asn.cargo?' · '+esc(asn.cargo):''} · ${esc(asn.email)}<br>${esc(asn.empresa)} · CNPJ ${esc(asn.cnpj)}<br><span style="font-size:8pt;color:#067647">Registro da assinatura: ${esc(asn.registro)}</span></div>`:''}</div>
+    </div>
+    <div class="assin"><div><b>${esc(d.p.cliente)}</b>${d.p.contato?esc(d.p.contato)+' · ':''}Contratante</div><div><b>${ct?esc(ct.empresa):'&nbsp;'}</b>${ct&&ct.nome?esc(ct.nome)+' · ':''}${ct&&ct.cnpj?'CNPJ '+esc(ct.cnpj)+' · ':''}Contratada</div></div>
+    <div class="local">${asn?`Local e data: ${esc(asn.cidade)}, ${esc(new Date(asn.dataHora).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}))}`:'Local e data: ______________________________, ____ / ____ / ________'}</div>
   </section>
 
   <div class="rodape"><span>Proposta comercial nº ${num} · Emitida em ${esc(dataBR(d.p.data))}</span><span>© ${new Date().getFullYear()} Partner Precificação SaaS. Todos os direitos reservados.</span></div>
@@ -1368,6 +1426,7 @@ ${modo==='imprimir'?'<script>window.onload=()=>setTimeout(()=>window.print(),400
   return html;
 }
 function gerarPdfProposta(id){
+  const pp=db.propostas.find(x=>x.id===id);if(pp&&!exigirAssinatura(pp))return;
   const html=htmlProposta(id,'imprimir');if(!html)return alert('Proposta não encontrada.');
   const w=window.open('','_blank');if(!w)return alert('Permita a abertura de janelas para gerar o PDF.');w.document.open();w.document.write(html);w.document.close();
 }
@@ -1418,6 +1477,7 @@ function gmailUrl(para,assunto,corpo){return `https://mail.google.com/mail/?view
 let envioAtual=null;
 async function abrirEnvio(id,canal){
   const d=dadosProposta(id);if(!d)return;
+  if(!exigirAssinatura(d.p))return;
   const tel=telefoneComPais(d.cliente?.telefone),email=(d.cliente?.email||'').trim();
   if(canal==='whatsapp'&&!tel)return alert('Cadastre o telefone do cliente antes de enviar pelo WhatsApp.');
   if(canal==='email'&&!email)return alert('Cadastre o e-mail do cliente antes do envio.');
